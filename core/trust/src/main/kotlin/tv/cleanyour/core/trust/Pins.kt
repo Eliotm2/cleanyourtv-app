@@ -27,12 +27,12 @@ object TrustRoots {
 // :android:platform preBuild) fails the build when the asset differs.
 object PinnedLauncher {
     const val ASSET_NAME = "cleanyourtv-launcher.apk"
-    const val UPSTREAM_COMMIT = "4696e6e"
+    const val UPSTREAM_COMMIT = "fdd69b3"
     const val PACKAGE = "com.gathin.tvhome"
-    const val VERSION_CODE = 12L
-    const val VERSION_NAME = "3.0-thomas.3"
-    const val SIZE = 532_105L
-    const val SHA256 = "ad13071429db5f7716214671af93425c22bea1360b1fc3924f5a9ecb70bf2f1c"
+    const val VERSION_CODE = 13L
+    const val VERSION_NAME = "3.0-thomas.4"
+    const val SIZE = 537_229L
+    const val SHA256 = "01829c5d0452a47e166cd74d4455a95781656cff71ef994537469363437e7d14"
     // SHA-256 of the signing certificate (DER), "CN=Accueil TV, O=Thomas, C=FR", v2 and v3.
     const val SIGNER_SHA256 = "fa73a3a033c6bb075706307ff446928530b90305a198b4349b02c4ce1eae29d5"
 }
@@ -48,8 +48,8 @@ object PinnedCurtain {
     const val RECEIVER = ".CueReceiver"
     const val VERSION_CODE = 1L
     const val VERSION_NAME = "0.1"
-    const val SIZE = 61_859L
-    const val SHA256 = "b4b7d6df2676bd85935d292694966369061ac945fe6597ee13d53fa2f5c95079"
+    const val SIZE = 537_229L
+    const val SHA256 = "01829c5d0452a47e166cd74d4455a95781656cff71ef994537469363437e7d14"
     const val SIGNER_SHA256 = PinnedLauncher.SIGNER_SHA256
 }
 
