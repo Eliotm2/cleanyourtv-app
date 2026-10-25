@@ -613,7 +613,9 @@ class DefaultEngine(
         }
         for (line in rendered.lines) {
             val r = send(session, line, ExecSpec(timeoutMs = rendered.timeoutMs, stdoutCap = rendered.stdoutCap, retry = RetryClass.NEVER))
-            if (r.exit != 0) return Outcome.Refused(r.exit, r.stderr)
+            // Fork (Thomas): pm writes its "Failure [DELETE_FAILED_…]" to stdout, so with an empty stderr the
+            // stdout head is what the pause line and the stop card show (TCL G08, pm uninstall exit 1).
+            if (r.exit != 0) return Outcome.Refused(r.exit, r.stderr.ifBlank { r.stdout })
             ownOutput = r.stdout
         }
         when (val t = rendered.transfer) {
