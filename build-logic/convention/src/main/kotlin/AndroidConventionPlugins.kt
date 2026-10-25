@@ -77,7 +77,7 @@ class AndroidAppConventionPlugin : Plugin<Project> {
             namespace = "tv.cleanyour.app"
             compileSdk = Toolchain.COMPILE_SDK
             defaultConfig {
-                applicationId = "tv.cleanyour.app"
+                applicationId = "fr.thomas.cleanyourtv"   // fork (Thomas): installs beside the upstream app, which keeps its restore point
                 minSdk = Toolchain.MIN_SDK
                 targetSdk = Toolchain.TARGET_SDK
                 // versionCode and versionName live in app/build.gradle.kts (STORES-PLAN 3), the one
@@ -246,6 +246,9 @@ private fun Project.configureTests() {
     tasks.withType<Test>().configureEach {
         useJUnit()
         systemProperty(repoRootProperty, rootDir.absolutePath)
+        // Fork (Thomas): Robolectric downloads android-all itself; Maven Central rate-limits the build box.
+        systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
+        systemProperty("robolectric.dependency.repo.id", "google-mirror")
         // A hung test fails after 5 minutes instead of holding the shared forge build lock.
         timeout.set(java.time.Duration.ofMinutes(5))
     }

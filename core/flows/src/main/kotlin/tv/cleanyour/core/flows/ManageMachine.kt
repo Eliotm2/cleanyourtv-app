@@ -43,6 +43,7 @@ data class ManageState(
 enum class ManageSection(val key: String) {
     HOME_SCREEN("home"), MODULES("modules"), SWITCHED_OFF("switchedoff"), LEFTOVERS("leftovers"),
     RESTORE_POINT("restore"), TV_SETTINGS("tvsettings"),
+    INSTALL_APK("installapk"),   // fork (Thomas)
 }
 
 sealed interface ManageIntent {

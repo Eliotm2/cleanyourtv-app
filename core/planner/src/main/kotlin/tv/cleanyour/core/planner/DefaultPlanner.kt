@@ -98,6 +98,7 @@ class DefaultPlanner(
             is PlanRequest.WriteRestorePoint -> { d.writeRestorePoint(request.restorePointJson, request.restoreTxt); PlanKind.WRITE_RESTORE_POINT }
             PlanRequest.Reboot -> { d.reboot(); PlanKind.REBOOT }
             is PlanRequest.UpdateLauncher -> { d.updateLauncher(request.launcher); PlanKind.UPDATE_LAUNCHER }
+            is PlanRequest.InstallApk -> { d.installUserApk(request); PlanKind.INSTALL_APK }
         }
         if (d.reasons.isNotEmpty()) return PlanResult.Refused(d.reasons.toList())
         val steps = d.steps.toList()
@@ -621,6 +622,22 @@ class DefaultPlanner(
             // screen on the TV there is nothing to read it, so the add goes without it.
             val config = req.config
             if (config != null && installed(launcher.pkg)) look(config, req.wallpaper, overlayGone = false, pushPolicy = FailurePolicy.STOP_AND_ROLLBACK)
+            step(Op.PressHome, null, GROUP_MODULE, "Showing the home screen", FailurePolicy.CONTINUE)
+        }
+
+        // Fork (Thomas): an APK the person picked on the phone. The same checks as a module, without an
+        // index to compare with: the file is what the phone inspected, the TV accepts installs, and a copy
+        // already on the TV carries the same key (Android refuses the update otherwise). The same version
+        // is installed again (-r), so a fresh copy can replace a broken one.
+        fun installUserApk(req: PlanRequest.InstallApk) {
+            val info = req.info
+            if (req.apk.sha256 != info.sha256 || req.apk.size != info.size) { refuse("the file changed since it was checked"); return }
+            if (snapshot.facts.installRefusal) { refuse("this TV refuses app installs"); return }
+            val current = state(info.pkg)
+            if (current != null && current.signer != null && current.signer != info.signer) { refuse("${req.label} is already on the TV, installed with another key; remove that copy on the TV first"); return }
+            if (current != null && current.versionCode > info.versionCode) { refuse("the TV already has a newer ${req.label} (version code ${current.versionCode}, this file is ${info.versionCode})"); return }
+            installApk(req.apk, info.sha256, info.pkg, info.versionCode, info.signer,
+                present = current != null, group = GROUP_MODULE, narration = "Installing ${req.label} on the TV")
             step(Op.PressHome, null, GROUP_MODULE, "Showing the home screen", FailurePolicy.CONTINUE)
         }
 

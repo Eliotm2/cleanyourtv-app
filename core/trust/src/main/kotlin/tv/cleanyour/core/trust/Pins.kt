@@ -20,20 +20,21 @@ object TrustRoots {
     fun indexVerifier(): MinisignIndexVerifier = MinisignIndexVerifier(indexRoot, keysFloor = BUNDLED_KEYS_SEQUENCE)
 }
 
-// The launcher APK bundled in the phone app (D13, Q1): upstream github.com/Gathin23/cleanyourtv at
-// tag v2.7.0, commit 3e34f40 (third_party/cleanyourtv), `assembleRelease` twice, both re-signed with
-// the dedicated launcher release key and compared by scripts/build-launcher-on-forge.sh. The verifyLauncherPin task (part of
-// :core:trust check and of :android:platform preBuild) fails the build when the asset differs.
+// Fork (Thomas): the launcher bundled here is Thomas's fork of github.com/Gathin23/cleanyourtv
+// (launcher 3.0 plus weather, night mode and stats; branch "thomas" of the fork, commit below),
+// `assembleRelease` signed with the fork's own key (CN=Accueil TV, O=Thomas), the same key that signs
+// this app and the curtain. The verifyLauncherPin task (part of :core:trust check and of
+// :android:platform preBuild) fails the build when the asset differs.
 object PinnedLauncher {
     const val ASSET_NAME = "cleanyourtv-launcher.apk"
-    const val UPSTREAM_COMMIT = "3e34f40f42728284bbb3d4d7bea57c3f504c3b31"
+    const val UPSTREAM_COMMIT = "7982a79c3b40bee7c35205be1b236e5491845f5a"
     const val PACKAGE = "com.gathin.tvhome"
-    const val VERSION_CODE = 8L
-    const val VERSION_NAME = "2.7"
-    const val SIZE = 491_007L
-    const val SHA256 = "43e7633f0dded944a85fff8fd5b947342f90039538922a0b92faf04f086f206f"
-    // SHA-256 of the signing certificate (DER), "O=cleanyourtv, CN=Clean Your TV launcher", v2 and v3.
-    const val SIGNER_SHA256 = "576418154bec6505bfc709ccaa6ae85b6e09d98eb89f4a25147ca1b4b0505132"
+    const val VERSION_CODE = 10L
+    const val VERSION_NAME = "3.0-thomas.1"
+    const val SIZE = 532_249L
+    const val SHA256 = "49ad9047691f68cc999395e9f7d7dbedf48d5d8c2e1c898d2e951210dd4cd111"
+    // SHA-256 of the signing certificate (DER), "CN=Accueil TV, O=Thomas, C=FR", v2 and v3.
+    const val SIGNER_SHA256 = "fa73a3a033c6bb075706307ff446928530b90305a198b4349b02c4ce1eae29d5"
 }
 
 // The TV curtain bundled in the phone app (RFC-CURTAIN-1): module :tv:curtain of this repo, built
@@ -47,8 +48,8 @@ object PinnedCurtain {
     const val RECEIVER = ".CueReceiver"
     const val VERSION_CODE = 1L
     const val VERSION_NAME = "0.1"
-    const val SIZE = 65_955L
-    const val SHA256 = "eb21e112c97121a3ed7f4db1c7fbf2169bc172a14bb3f8ca781079de4651662e"
+    const val SIZE = 61_859L
+    const val SHA256 = "b4b7d6df2676bd85935d292694966369061ac945fe6597ee13d53fa2f5c95079"
     const val SIGNER_SHA256 = PinnedLauncher.SIGNER_SHA256
 }
 

@@ -17,7 +17,12 @@ object Store : StorePorts {
 
     // D12: one GET on user action (Settings, "Check for updates"); "couldn't check" when GitHub
     // does not answer or the repository has no published release yet.
-    override fun updateChecker(http: HttpFetcher) = UpdateChecker { current ->
+    // Fork (Thomas): no release feed of its own, and an upstream release could not install over this
+    // key anyway, so "Check for updates" answers "couldn't check" (null) instead of offering one.
+    override fun updateChecker(http: HttpFetcher) = UpdateChecker { null }
+
+    @Suppress("unused")
+    fun upstreamUpdateChecker(http: HttpFetcher) = UpdateChecker { current ->
         val r = http.get(RELEASES_URL, null, null)
         if (r.code != 200) { r.body?.close(); null } else {
             val body = r.body?.use { it.readBytes().decodeToString() } ?: return@UpdateChecker null

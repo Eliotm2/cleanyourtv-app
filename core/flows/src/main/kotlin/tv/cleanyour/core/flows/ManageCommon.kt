@@ -41,6 +41,7 @@ sealed interface ManageEffect {
     data class Snackbar(val kind: SnackKind, val name: String, val undo: Boolean, val pkg: PackageName? = null) : ManageEffect
     data class Share(val text: String) : ManageEffect
     data class CreateDocument(val suggestedName: String) : ManageEffect   // SAF ACTION_CREATE_DOCUMENT
+    data object PickDocument : ManageEffect                                // fork (Thomas): SAF ACTION_OPEN_DOCUMENT for an APK
     data class OpenUrl(val url: String) : ManageEffect
     data class Copy(val text: String) : ManageEffect                     // to the clipboard (0.3.2 B1, B2)
     data object HapticLight : ManageEffect

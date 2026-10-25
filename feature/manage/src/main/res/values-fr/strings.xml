@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork (Thomas) : seules les chaînes ajoutées par le fork sont traduites ; le reste de l'appli reste en anglais. -->
+<resources>
+    <string name="manage_row_installapk">Installer une appli</string>
+    <string name="manage_row_installapk_sub">Un fichier APK du téléphone, vers la télé</string>
+    <string name="installapk_title">Installer une appli</string>
+    <string name="installapk_lead">Choisis un fichier APK sur ce téléphone ; il part vers {tv} par la même connexion et s\'y installe. Ne télécharge les APK que depuis le site ou la page GitHub officielle de l\'appli.</string>
+    <string name="installapk_pick">Choisir un fichier APK</string>
+    <string name="installapk_pick_other">Choisir un autre fichier</string>
+    <string name="installapk_not_apk">Ce fichier n\'a pas pu être lu comme une appli Android.</string>
+    <string name="installapk_reading">Lecture du fichier…</string>
+    <string name="installapk_file">Fichier</string>
+    <string name="installapk_package">Paquet</string>
+    <string name="installapk_version">Version</string>
+    <string name="installapk_size">Taille</string>
+    <string name="installapk_size_mb">{mb} Mo</string>
+    <string name="installapk_key">Clé de signature</string>
+    <string name="installapk_on_tv">Sur la télé</string>
+    <string name="installapk_on_tv_no">Pas installée</string>
+    <string name="installapk_on_tv_version">Code de version {code}</string>
+    <string name="installapk_on_tv_other_key">Installée avec une autre clé : Android refuserait ce fichier. Retire d\'abord cette copie sur la télé.</string>
+    <string name="installapk_on_tv_newer">La télé a une version plus récente ; ce fichier serait refusé.</string>
+    <string name="installapk_on_tv_same">La même version ; elle est réinstallée par-dessus.</string>
+    <string name="installapk_on_tv_older">Une version plus ancienne ; ce fichier la met à jour.</string>
+    <string name="installapk_installing">Installation sur la télé…</string>
+    <string name="installapk_done">{name} est installée sur la télé.</string>
+    <string name="installapk_failed">{name} n\'a pas pu être installée. Vérifie que la télé est allumée et connectée, puis réessaie.</string>
+    <string name="installapk_install">Installer sur la télé</string>
+    <string name="installapk_install_again">Installer cette version sur la télé</string>
+    <string name="installapk_note">Les applis installées ainsi apparaissent dans les réglages de la télé comme les autres, et « Undo everything » les retire.</string>
+</resources>

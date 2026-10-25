@@ -2,6 +2,7 @@ pluginManagement {
     includeBuild("build-logic")
     repositories {
         google()
+        maven("https://maven-central.storage-download.googleapis.com/maven2") // miroir Google de Maven Central
         mavenCentral()
         gradlePluginPortal()
     }
@@ -14,6 +15,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        maven("https://maven-central.storage-download.googleapis.com/maven2") // miroir Google de Maven Central
         mavenCentral()
     }
 }

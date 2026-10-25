@@ -193,4 +193,32 @@
     <string name="report_share">Share</string>
     <string name="report_loading">Making the report</string>
     <string name="report_unavailable">We need to read this TV once before we can make its report. Set it up or connect to it, then try again.</string>
+    <!-- Fork (Thomas): Install an app (APK) -->
+    <string name="manage_row_installapk">Install an app</string>
+    <string name="manage_row_installapk_sub">An APK file from this phone, onto the TV</string>
+    <string name="installapk_title">Install an app</string>
+    <string name="installapk_lead">Choose an APK file on this phone; it goes to {tv} over the same connection and is installed there. Download APKs only from the app\'s own site or GitHub page.</string>
+    <string name="installapk_pick">Choose an APK file</string>
+    <string name="installapk_pick_other">Choose another file</string>
+    <string name="installapk_not_apk">That file could not be read as an Android app.</string>
+    <string name="installapk_reading">Reading the file…</string>
+    <string name="installapk_file">File</string>
+    <string name="installapk_package">Package</string>
+    <string name="installapk_version">Version</string>
+    <string name="installapk_size">Size</string>
+    <string name="installapk_size_mb">{mb} MB</string>
+    <string name="installapk_key">Signing key</string>
+    <string name="installapk_on_tv">On the TV</string>
+    <string name="installapk_on_tv_no">Not installed</string>
+    <string name="installapk_on_tv_version">Version code {code}</string>
+    <string name="installapk_on_tv_other_key">Installed with another key: Android would refuse this file. Remove that copy on the TV first.</string>
+    <string name="installapk_on_tv_newer">The TV has a newer version; this file would be refused.</string>
+    <string name="installapk_on_tv_same">The same version; it is installed again over itself.</string>
+    <string name="installapk_on_tv_older">An older version; this file updates it.</string>
+    <string name="installapk_installing">Installing on the TV…</string>
+    <string name="installapk_done">{name} is installed on the TV.</string>
+    <string name="installapk_failed">{name} could not be installed. Check the TV is on and connected, then try again.</string>
+    <string name="installapk_install">Install on the TV</string>
+    <string name="installapk_install_again">Install this version on the TV</string>
+    <string name="installapk_note">Apps installed this way are listed in the TV\'s own settings like any other and are removed by Undo everything.</string>
 </resources>

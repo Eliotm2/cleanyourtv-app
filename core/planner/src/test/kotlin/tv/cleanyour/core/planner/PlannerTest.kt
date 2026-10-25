@@ -301,6 +301,30 @@ class PlannerTest {
         assertEquals(listOf(Op.Uninstall(launcher.pkg)), ops(plan(PlanRequest.RemoveModule(launcher.pkg), snapshot(extra = mapOf(installedLauncher())))))
     }
 
+    // Fork (Thomas): an APK picked on the phone takes the module's install path, with the file's own
+    // package, version and key; the same checks as a module minus the index ones.
+    @Test fun installApkFromThePhone() {
+        val sha = Sha256("d".repeat(64)); val signer = Sha256("e".repeat(64))
+        val apk = BlobRef(sha, 5000, "cache/smarttube")
+        val pkg = PackageName("com.liskovsoft.smarttubetv.beta")
+        val info = tv.cleanyour.core.model.ApkInfo(pkg, 7L, "28.1", signer, sha, 5000, "pm")
+        val p = plan(PlanRequest.InstallApk(apk, info, "SmartTube"))
+        assertEquals(listOf("InstallStream", "PressHome"), ops(p).map { it::class.simpleName })
+        assertEquals(PlanKind.INSTALL_APK, p.kind)
+        val install = ops(p).first() as Op.InstallStream
+        assertEquals(pkg, install.pkg); assertEquals(7L, install.versionCode); assertEquals(signer, install.signer)
+        assertTrue(p.steps.first().rendered.privilege == Privilege.COMMUNITY)
+        assertTrue(p.steps.first().narration.contains("SmartTube"))
+        assertTrue(refused(PlanRequest.InstallApk(apk.copy(size = 1), info, "SmartTube")).single().contains("changed"))
+        // Already there with another key: refused; an older copy: replaced; a newer copy: refused.
+        val otherKey = pkg to PackageState(EnabledState.ENABLED, false, 7, Sha256("f".repeat(64)), false, false, null, false)
+        assertTrue(refused(PlanRequest.InstallApk(apk, info, "SmartTube"), snapshot(extra = mapOf(otherKey))).single().contains("another key"))
+        val older = pkg to PackageState(EnabledState.ENABLED, false, 6, signer, false, false, null, false)
+        assertIs<Op.InstallStream>(ops(plan(PlanRequest.InstallApk(apk, info, "SmartTube"), snapshot(extra = mapOf(older)))).first())
+        val newer = pkg to PackageState(EnabledState.ENABLED, false, 8, signer, false, false, null, false)
+        assertTrue(refused(PlanRequest.InstallApk(apk, info, "SmartTube"), snapshot(extra = mapOf(newer))).single().contains("newer"))
+    }
+
     // RFC-CARDS-1: an add that turns the TV's module cards on carries the look in the same plan:
     // the install, then the transport's steps as ApplyTheme sends them (so Show commands and the
     // hash include the push), then Home. Without the new home screen on the TV the look is left out.

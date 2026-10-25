@@ -151,6 +151,10 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
                     onClick = { onIntent(ManageIntent.Open(ManageSection.RESTORE_POINT)) })
                 ListDivider()
                 ListRow(stringResource(R.string.manage_row_tvsettings), onClick = { onIntent(ManageIntent.Open(ManageSection.TV_SETTINGS)) })
+                ListDivider()
+                // Fork (Thomas): an APK from the phone onto the TV.
+                ListRow(stringResource(R.string.manage_row_installapk), subtitle = stringResource(R.string.manage_row_installapk_sub),
+                    onClick = { onIntent(ManageIntent.Open(ManageSection.INSTALL_APK)) })
             }
         }
         val others = state.cards.filter { it.id != tv?.id }

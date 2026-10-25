@@ -39,6 +39,9 @@ class AndroidRoborazziConventionPlugin : Plugin<Project> {
             maxParallelForks = 1
             maxHeapSize = "1280m"
             systemProperty("robolectric.graphicsMode", "NATIVE")
+            // Fork (Thomas): Robolectric downloads android-all itself; Maven Central rate-limits the build box.
+            systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
+            systemProperty("robolectric.dependency.repo.id", "google-mirror")
             systemProperty("robolectric.pixelCopyRenderMode", "hardware")
             testLogging {
                 events("failed")

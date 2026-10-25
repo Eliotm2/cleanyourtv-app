@@ -180,10 +180,24 @@ private val playOffGroups = offGroups.dropLast(1) + OffGroup("updates", "Softwar
 )) + offGroups.last()
 private val playAskGroups = askGroups.filter { it.id != "updates" }
 
+// Fork (Thomas): a picked APK as the phone reads it.
+private fun installApk(onTv: tv.cleanyour.core.flows.OnTv? = null, step: tv.cleanyour.core.flows.ApkStep? = null): tv.cleanyour.core.flows.InstallApkState {
+    val sha = tv.cleanyour.core.model.Sha256("d".repeat(64)); val signer = tv.cleanyour.core.model.Sha256("e".repeat(64))
+    val info = tv.cleanyour.core.model.ApkInfo(PackageName("com.liskovsoft.smarttubetv.beta"), 7L, "28.1", signer, sha, 69_123_456L, "pm")
+    val picked = tv.cleanyour.core.flows.PickedApk("SmartTube_28.1_stable.apk", tv.cleanyour.core.model.BlobRef(sha, info.size, "cache/x"), info, signer.hex.take(12))
+    return tv.cleanyour.core.flows.InstallApkState("Mi TV 4A", picked, onTv, step)
+}
+
 object ManageShots {
     val all: List<Shot> = listOf(
         // M1 Manage
         Shot("manage_clean") { ManageScreen(manage(), {}) },
+        // Fork (Thomas): Install an app, empty, a picked APK the TV does not have, and one installing.
+        Shot("installapk_empty") { InstallApkScreen(tv.cleanyour.core.flows.InstallApkState("Mi TV 4A"), {}, {}) },
+        Shot("installapk_picked", tall) { InstallApkScreen(installApk(), {}, {}) },
+        Shot("installapk_installing", tall) { InstallApkScreen(installApk(onTv = tv.cleanyour.core.flows.OnTv(6, "SmartTube", true), step = tv.cleanyour.core.flows.ApkStep.Installing(42)), {}, {}) },
+        Shot("installapk_refused", tall) { InstallApkScreen(installApk(onTv = tv.cleanyour.core.flows.OnTv(7, "SmartTube", false),
+            step = tv.cleanyour.core.flows.ApkStep.Refused(listOf("SmartTube is already on the TV, installed with another key; remove that copy on the TV first"))), {}, {}) },
         Shot("manage_custom_level") { ManageScreen(manage(card(level = Level.CUSTOM)), {}) },
         Shot("manage_original") { ManageScreen(manage(card(clean = false, switchedOff = 0)), {}) },
         Shot("manage_offline") { ManageScreen(manage(card(chip = ChipState.OFFLINE), offline = true), {}) },

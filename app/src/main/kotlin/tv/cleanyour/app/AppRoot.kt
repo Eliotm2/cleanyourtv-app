@@ -46,6 +46,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import tv.cleanyour.core.flows.AppConfirm
 import tv.cleanyour.core.flows.DoorPhase
+import tv.cleanyour.core.flows.InstallApkIntent
 import tv.cleanyour.core.flows.ManageEffect
 import tv.cleanyour.core.flows.ReportKind
 import tv.cleanyour.core.flows.Reach
@@ -64,6 +65,7 @@ import tv.cleanyour.feature.launcher.HomeScreen
 import tv.cleanyour.feature.manage.AppSettingsScreen
 import tv.cleanyour.feature.manage.DebugStepSheet
 import tv.cleanyour.feature.manage.LeftoversScreen
+import tv.cleanyour.feature.manage.InstallApkScreen
 import tv.cleanyour.feature.manage.ManageScreen
 import tv.cleanyour.feature.manage.OpenWriteSheet
 import tv.cleanyour.feature.manage.ReportScreen
@@ -83,6 +85,7 @@ import tv.cleanyour.feature.setup.SetupFlow
     @Serializable data class Modules(val tvId: String) : Dest
     @Serializable data class Restore(val tvId: String) : Dest
     @Serializable data class TvSettings(val tvId: String) : Dest
+    @Serializable data class InstallApk(val tvId: String) : Dest   // fork (Thomas)
     @Serializable data object AppSettings : Dest
     // 0.3.2 B1, B2: the report preview; kind is ReportKind.key ("tv" or "problem").
     @Serializable data class Report(val kind: String, val tvId: String? = null) : Dest
@@ -114,6 +117,7 @@ internal fun applyRoute(stack: MutableList<NavKey>, route: String, noTvs: Boolea
         "leftovers" -> id?.let { Dest.Leftovers(it) }
         "restore" -> id?.let { Dest.Restore(it) }
         "tvsettings" -> id?.let { Dest.TvSettings(it) }
+        "installapk" -> id?.let { Dest.InstallApk(it) }
         "appsettings" -> Dest.AppSettings
         "report" -> id?.let { k -> ReportKind.of(k) }?.let { k -> if (k == ReportKind.TV && parts.getOrNull(2) == null) null else Dest.Report(k.key, parts.getOrNull(2)) }
         "back" -> return if (stack.size > 1) { stack.removeAt(stack.lastIndex); true } else false
@@ -187,8 +191,9 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
         SetupEffect.RequestNotificationPermission -> if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) else Unit
     }
 
-    suspend fun onManageEffect(e: ManageEffect, onDocument: (String) -> Unit = {}, onUndo: (ManageEffect.Snackbar) -> Unit = {}) {
+    suspend fun onManageEffect(e: ManageEffect, onDocument: (String) -> Unit = {}, onUndo: (ManageEffect.Snackbar) -> Unit = {}, onPick: () -> Unit = {}) {
         when (e) {
+            ManageEffect.PickDocument -> onPick()
             is ManageEffect.Navigate -> go(e.key)
             is ManageEffect.Share -> share(e.text)
             is ManageEffect.OpenUrl -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(e.url))) }
@@ -272,6 +277,22 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
                     SecureWindow(state.exporting)
                     RestoreScreen(state, m::dispatch, onBack = { go("back") })
                 }
+                // Fork (Thomas): an APK from the phone. SAF needs no permission; the file is copied into the blob
+                // store (sha256 and size first, as put() demands) and read with the package manager before the
+                // machine sees it.
+                entry<Dest.InstallApk> { key ->
+                    val m = rememberMachine("installapk:${key.tvId}") { graph.installApk(it, TvId(key.tvId)) }
+                    val state by m.state.collectAsStateWithLifecycle()
+                    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                        if (uri != null) scope.launch {
+                            m.dispatch(InstallApkIntent.Reading)
+                            val picked = withContext(Dispatchers.IO) { readPickedApk(context, uri, graph.manageDeps.blobs, graph.manageDeps.inspector) }
+                            m.dispatch(picked ?: InstallApkIntent.NotAnApk)
+                        }
+                    }
+                    LaunchedEffect(m) { m.effects.collect { onManageEffect(it, onPick = { pick.launch(arrayOf("application/vnd.android.package-archive", "application/octet-stream", "*/*")) }) } }
+                    InstallApkScreen(state, m::dispatch, onBack = { go("back") })
+                }
                 entry<Dest.TvSettings> { key ->
                     val m = rememberMachine("tvsettings:${key.tvId}") { graph.tvSettings(it, TvId(key.tvId)) }
                     val state by m.state.collectAsStateWithLifecycle()
@@ -333,3 +354,35 @@ object SnackText {
     }
 }
 
+// Fork (Thomas): the chosen file into the blob store, then its ApkInfo; null when it is not an APK.
+private suspend fun readPickedApk(context: android.content.Context, uri: Uri, blobs: tv.cleanyour.core.store.BlobStore,
+    inspector: tv.cleanyour.core.trust.ApkInspector): InstallApkIntent.Picked? {
+    val resolver = context.contentResolver
+    val name = runCatching {
+        resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: "app.apk"
+    val tmp = java.io.File(context.cacheDir, "picked-${System.nanoTime()}.apk")
+    try {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        var size = 0L
+        resolver.openInputStream(uri)?.use { input ->
+            java.io.FileOutputStream(tmp).use { out ->
+                val buf = ByteArray(65_536)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n); digest.update(buf, 0, n); size += n
+                }
+            }
+        } ?: return null
+        if (size == 0L || size > 200L * 1024 * 1024) return null
+        val sha = tv.cleanyour.core.model.Sha256(digest.digest().joinToString("") { "%02x".format(it) })
+        val blob = blobs.put(sha, java.io.FileInputStream(tmp), size)
+        val info = runCatching { inspector.inspect(blob) }.getOrNull() ?: return null
+        return InstallApkIntent.Picked(name, blob, info)
+    } finally {
+        tmp.delete()
+    }
+}

@@ -233,6 +233,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     fun modules(scope: CoroutineScope, tvId: TvId) = ModulesMachine(manageDeps, scope, tvId)
     fun restorePoint(scope: CoroutineScope, tvId: TvId) = RestorePointMachine(manageDeps, scope, tvId)
     fun tvSettings(scope: CoroutineScope, tvId: TvId) = TvSettingsMachine(manageDeps, scope, tvId)
+    fun installApk(scope: CoroutineScope, tvId: TvId) = tv.cleanyour.core.flows.InstallApkMachine(manageDeps, scope, tvId)   // fork (Thomas)
     fun appSettings(scope: CoroutineScope) = AppSettingsMachine(manageDeps, scope)
     fun report(scope: CoroutineScope, kind: ReportKind, tvId: TvId?) = ReportMachine(manageDeps, scope, kind, tvId)
 

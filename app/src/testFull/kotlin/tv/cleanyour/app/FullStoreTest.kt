@@ -59,16 +59,18 @@ class FullStoreTest {
 
     @Test fun theUpdateCheckAsksGithubForTheLatestRelease() = runBlocking {
         val newer = OneAnswer(200, """{"tag_name": "v0.4.0", "name": "x"}""")
-        assertEquals("0.4.0", Store.updateChecker(newer).latestNewerThan("0.3.0"))
+        // Fork (Thomas): the fork's own checker never offers a release; the upstream one is kept for reference.
+        assertEquals(null, Store.updateChecker(newer).latestNewerThan("0.3.0"))
+        assertEquals("0.4.0", Store.upstreamUpdateChecker(newer).latestNewerThan("0.3.0"))
         assertEquals(listOf(Store.RELEASES_URL), newer.urls)
-        assertEquals("", Store.updateChecker(OneAnswer(200, """{"tag_name":"v0.3.0"}""")).latestNewerThan("0.3.0"))
-        assertEquals(null, Store.updateChecker(OneAnswer(404, "")).latestNewerThan("0.3.0"))
+        assertEquals("", Store.upstreamUpdateChecker(OneAnswer(200, """{"tag_name":"v0.3.0"}""")).latestNewerThan("0.3.0"))
+        assertEquals(null, Store.upstreamUpdateChecker(OneAnswer(404, "")).latestNewerThan("0.3.0"))
         assertEquals("https://github.com/udhaykumarbala/cleanyourtv-app/releases", Store.releasePage)
     }
 
     // Test build: 0.3.5-test1 is offered 0.3.5 and later, never the 0.3.4 it installs over.
     @Test fun aTestBuildIsOfferedOnlyANewerRelease() = runBlocking {
-        fun latest(tag: String, current: String) = runBlocking { Store.updateChecker(OneAnswer(200, "{\"tag_name\":\"v$tag\"}")).latestNewerThan(current) }
+        fun latest(tag: String, current: String) = runBlocking { Store.upstreamUpdateChecker(OneAnswer(200, "{\"tag_name\":\"v$tag\"}")).latestNewerThan(current) }
         assertEquals("", latest("0.3.4", "0.3.5-test1"))
         assertEquals("0.3.5", latest("0.3.5", "0.3.5-test1"))
         assertEquals("0.4.0", latest("0.4.0", "0.3.5-test1"))
