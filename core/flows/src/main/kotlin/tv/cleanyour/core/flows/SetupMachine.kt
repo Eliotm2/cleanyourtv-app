@@ -768,7 +768,7 @@ class SetupMachine(
         val installed = snap.packages[launcher.pkg]
         // The dock and the rows under it, cut to what the chosen look holds (DockLayers).
         val theme = draft.themeId?.let { id -> deps.themes.bundled().firstOrNull { it.id == id } }
-        val columns = DockLayers.columnsOf(theme?.doc)
+        val columns = ForkLook.columnsOf(theme?.doc)
         val dock = DockLayers.trim(draft.dock ?: deps.dock.pick(profile(), snap.packages.keys, snap.hdmi.isNotEmpty(), profile()?.liveTv, deps.locale()), columns)
         val wifi = wizardWifi(s, snap)
         val block = homeBlock(snap, wifi)
@@ -876,7 +876,7 @@ class SetupMachine(
     private fun setLevel(level: Level) = editDraft { it.copy(level = level) }
 
     private fun dockColumns(themeId: String?): Int =
-        DockLayers.columnsOf(themeId?.let { id -> deps.themes.bundled().firstOrNull { it.id == id } }?.doc)
+        ForkLook.columnsOf(themeId?.let { id -> deps.themes.bundled().firstOrNull { it.id == id } }?.doc)
 
     // the run (S3 to S4)
 

@@ -68,6 +68,9 @@ val miProfile = Profile(
 
 // Every fake wired the way the app wires the real things.
 class Harness(val clock: FakeClock = FakeClock(Samples.NOW_MS), val facts: tv.cleanyour.core.spec.FactsTable = MapFactsTable()) {
+    init {
+        ForkLook.columns = 4   // fork (Thomas): the upstream expectations below assume 4 tiles a row
+    }
     val discovery = FakeDiscovery()
     val session = FakeTvSession()
     val sessions = FakeSessionManager().apply { register(HOST, session) }

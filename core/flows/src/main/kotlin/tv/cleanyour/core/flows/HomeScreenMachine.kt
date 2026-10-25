@@ -130,7 +130,7 @@ class HomeScreenMachine(
             .map { AppChoice(it, d.nameOf(it, packages[it]?.label)) }.sortedBy { it.name.lowercase() }
         // The dock as the TV shows it: an app no longer there (gone, switched off) is skipped and the
         // later ones move up a slot, as the launcher does.
-        val columns = DockLayers.columnsOf(theme(choice?.themeId)?.doc)
+        val columns = ForkLook.columnsOf(theme(choice?.themeId)?.doc)
         val shown = { p: PackageName -> snap == null || packages[p]?.enabled.let { it != null && it != EnabledState.DISABLED && it != EnabledState.DISABLED_USER } }
         val dock = DockLayers.decode(choice?.dock.orEmpty(), shown, columns).map { AppChoice(it, d.nameOf(it, packages[it]?.label)) }
         send(Loaded(HomeScreenState(tv.nickname, dock, apps, choice?.themeId, state.value.themes, stock = profile?.stockLaunchers?.firstOrNull(),

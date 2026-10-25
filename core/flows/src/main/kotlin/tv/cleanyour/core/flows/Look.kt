@@ -21,7 +21,10 @@ import tv.cleanyour.core.store.BlobStore
 internal class Look(val doc: LauncherConfigDoc, val digest: Sha256, val config: BlobRef, val wallpaper: BlobRef?) {
     companion object {
         suspend fun encode(encoder: ConfigEncoder, blobs: BlobStore, theme: Theme?, dock: List<PackageName>, cards: Boolean): Look {
-            val doc = DockLayers.applyTo(theme?.doc ?: LauncherConfigDoc(), dock).copy(moduleCards = cards)
+            // Fork (Thomas): the look always names its columns (5 unless the theme says otherwise), so the phone's
+            // dock editor and the TV cut the rows the same way.
+            val base = (theme?.doc ?: LauncherConfigDoc()).let { it.copy(columns = it.columns ?: ForkLook.written()) }
+            val doc = DockLayers.applyTo(base, dock).copy(moduleCards = cards)
             val bytes = encoder.encode(doc)
             return Look(doc, sha256Of(bytes), blobs.putBytes(bytes), theme?.wallpaper)
         }
@@ -58,4 +61,14 @@ internal suspend fun rememberPushedLook(d: ManageDeps, tvId: TvId, digest: Sha25
     val pin = d.launcherPin.bundled()
     val l = tv.launcher ?: LauncherState(pin.versionCode, pin.signer, null, null)
     d.tvs.upsert(tv.copy(launcher = l.copy(overlayDigest = digest, ourOverlayDigest = digest)))
+}
+
+// Fork (Thomas): the forked launcher shows 5 tiles a row by default (its config.xml), not upstream's 4.
+object ForkLook {
+    const val COLUMNS = 5
+    /** The upstream tests were written for 4 a row; the test harness sets this to 4 so they keep their meaning. */
+    @Volatile var columns: Int = COLUMNS
+    fun columnsOf(doc: LauncherConfigDoc?): Int = doc?.columns?.takeIf { it in 1..8 } ?: columns
+    /** The columns written into a look that names none: only when they differ from the launcher's upstream default. */
+    fun written(): Int? = columns.takeIf { it != DockLayers.DEFAULT_COLUMNS }
 }
