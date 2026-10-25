@@ -69,7 +69,10 @@ class ShellRenderer(private val watchdogVariant: WatchdogVariant = WatchdogVaria
             Rendered(op, emptyList(), Transfer.StreamInstall(op.blob, op.blob.size), Privilege.COMMUNITY,
                 Op.Read(ProbeKind.PACKAGE_DUMP, ReadArg.Pkg(pkgName(op.pkg))), T_INSTALL + op.blob.size / 50, CAP_DEFAULT)
         }
-        is Op.Uninstall -> Rendered(op, lines(line(PM, "uninstall", USER, "0", writePkg(op.pkg))), null, Privilege.PROFILE_STEP,
+        // Fork (Thomas): for every user, not only user 0. On the TCL G08 an earlier "--user 0" uninstall
+        // left the package installed for another user: invisible in the TV's app list, its key unreadable,
+        // a new install refused (signatures do not match) and "--user 0" refused again (nothing to remove).
+        is Op.Uninstall -> Rendered(op, lines(line(PM, "uninstall", writePkg(op.pkg))), null, Privilege.PROFILE_STEP,
             Op.Read(ProbeKind.PACKAGES), T_PM, CAP_DEFAULT)
         is Op.SettingsPut -> {
             val ns = op.key.ns.name.lowercase()

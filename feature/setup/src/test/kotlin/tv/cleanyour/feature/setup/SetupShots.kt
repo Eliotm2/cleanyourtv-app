@@ -136,7 +136,7 @@ private val curtainCommands = listOf(
     CONFIG_SYNC,
     "pm disable-user --user 0 com.google.android.tvlauncher",
     "cmd package set-home-activity com.gathin.tvhome/.MainActivity",
-    "pm uninstall --user 0 tv.cleanyour.curtain",
+    "pm uninstall tv.cleanyour.curtain",
 )
 private val noHomePlan = plan(summary(listOf(
     GroupSummary("ads", "Adverts and sponsored rows", off = 6, total = 6, rows = emptyList()),
