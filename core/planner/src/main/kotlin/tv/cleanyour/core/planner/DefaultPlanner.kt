@@ -405,7 +405,11 @@ class DefaultPlanner(
             if (snapshot.facts.sdk < TV_MIN_SDK) { refuse(REASON_OLD_ANDROID); return false }
             val current = state(artifact.pkg)
             val present = current != null
-            if (current != null && current.signer != null && current.signer != artifact.signer) {
+            // Fork (Thomas): a copy whose key the probe could not read counts as another key too. On the
+            // TCL G08 the signer came back unreadable and the install then failed with
+            // INSTALL_FAILED_UPDATE_INCOMPATIBLE (the upstream launcher was still there); uninstalling first,
+            // under the same D36 conditions, is what the person asked for by replacing the home screen app.
+            if (current != null && current.signer != artifact.signer) {
                 if (!replaceSigner) { refuse("the home screen app on the TV was installed with a different key; replacing it needs consent (D36)"); return false }
                 val homeNow = snapshot.home.resolved
                 if (homeNow == null || stockLaunchers.none { it.pkg == homeNow.pkg }) { refuse("the home screen app can only be replaced while the TV's own home screen is in charge (D36)"); return false }

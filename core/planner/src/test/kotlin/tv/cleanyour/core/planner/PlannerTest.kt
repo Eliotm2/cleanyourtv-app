@@ -301,6 +301,16 @@ class PlannerTest {
         assertEquals(listOf(Op.Uninstall(launcher.pkg)), ops(plan(PlanRequest.RemoveModule(launcher.pkg), snapshot(extra = mapOf(installedLauncher())))))
     }
 
+    // Fork (Thomas): the launcher on the TV with an unreadable key is replaced like one with another key
+    // (uninstall first), as long as the TV's own home screen is in charge.
+    @Test fun launcherWithUnreadableKeyIsReplaced() {
+        val unreadable = launcher.pkg to PackageState(EnabledState.ENABLED, false, 8, null, false, false, null, false)
+        val p = plan(setup(choices = choices(takeover = true, installLauncher = true, replaceSigner = true)), snapshot(extra = mapOf(unreadable)))
+        val names = ops(p).map { it::class.simpleName }
+        assertTrue(names.indexOf("Uninstall") in 0 until names.indexOf("InstallStream"), names.toString())
+        assertTrue(p.summary.replacesLauncher)
+    }
+
     // Fork (Thomas): an APK picked on the phone takes the module's install path, with the file's own
     // package, version and key; the same checks as a module minus the index ones.
     @Test fun installApkFromThePhone() {

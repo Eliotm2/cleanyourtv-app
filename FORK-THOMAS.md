@@ -16,6 +16,11 @@ Identifiant d'appli `fr.thomas.cleanyourtv` (amont : `tv.cleanyour.app`), nom «
   (`PlanRequest.InstallApk`, `InstallApkMachine`, `InstallApkScreen`). « Undo everything » le retire comme toute
   appli installée par l'appli. Une copie installée avec une autre clé ou une version plus récente sur la télé est
   refusée avec la raison.
+- **Remplacement du launcher à clé illisible** (0.3.7-thomas.2) : sur la TCL G08 la sonde n'a pas pu lire la clé du launcher
+  amont déjà installé ; l'amont laissait alors la copie en place et l'installation échouait
+  (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), bascule annulée. Le fork traite une clé illisible comme une autre clé : la copie
+  est désinstallée d'abord, aux mêmes conditions (accueil d'origine aux commandes, règle D36). `SetupMachine` pose le
+  consentement et `DefaultPlanner.launcherInstall` ajoute l'étape.
 - **Vérification de mise à jour** désactivée (`Store.updateChecker` répond « couldn't check ») : une version amont
   ne pourrait pas s'installer par-dessus cette clé.
 - Chaînes du fork en anglais et en français (`feature/manage/res/values-fr`) ; le reste de l'appli reste en anglais.

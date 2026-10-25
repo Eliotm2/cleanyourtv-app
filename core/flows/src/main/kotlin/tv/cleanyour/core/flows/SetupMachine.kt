@@ -777,7 +777,10 @@ class SetupMachine(
             kept = draft.kept, extraOff = draft.extraOff, dock = dock,
             theme = theme,
             installLauncher = possible, takeover = possible,
-            replaceLauncherSigner = installed?.signer?.let { it != launcher.signer } ?: false,
+            // Fork (Thomas): a copy whose key could not be read is replaced too (the planner uninstalls it
+            // first, only while the TV's own home screen is in charge); upstream left it and the install
+            // then failed with INSTALL_FAILED_UPDATE_INCOMPATIBLE on the TCL G08.
+            replaceLauncherSigner = installed != null && installed.signer != launcher.signer,
             keepDebuggingOn = draft.keepDebuggingOn,
             wizardWifi = wifi,
         )

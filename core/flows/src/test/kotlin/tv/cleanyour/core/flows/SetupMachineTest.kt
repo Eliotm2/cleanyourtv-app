@@ -1163,7 +1163,8 @@ class SetupMachineTest {
     // plan's summary then carries replacesLauncher, which S3 shows above the button.
     @Test fun onlyALauncherUnderAnotherKeyIsReplaced() = runTest(timeout = 30.seconds) {
         val launcher = PackageName("com.gathin.tvhome")
-        for ((signer, replace) in listOf(Sha256("e".repeat(64)) to true, Samples.zeroHash to false, null to false)) {
+        // Fork (Thomas): an unreadable key (null) is replaced too, as the planner now uninstalls it first.
+        for ((signer, replace) in listOf(Sha256("e".repeat(64)) to true, Samples.zeroHash to false, null to true)) {
             val h = Harness()
             h.sessions.allowPromptFor[HOST] = "AB:CD:7F:2A"
             h.prober.snapshotFor = { r ->
