@@ -32,7 +32,7 @@ class LauncherPinTest {
         assertEquals("com.gathin.tvhome", PinnedLauncher.PACKAGE)
         // Fork (Thomas): the pin names the fork's commit, not the submodule's (which stays at upstream 2.7
         // for the fixtures), so the submodule comparison is off.
-        assertEquals("7982a79c3b40bee7c35205be1b236e5491845f5a", PinnedLauncher.UPSTREAM_COMMIT)
+        assertEquals("1b061dd", PinnedLauncher.UPSTREAM_COMMIT)
         val gitlink = File(Repo.root, "third_party/cleanyourtv/.git")
         if (false && gitlink.exists()) {
             // The submodule checkout and the pin must agree (DECISIONS-W1 D-W1-8, ARCHITECTURE 6.2).
@@ -46,8 +46,8 @@ class LauncherPinTest {
         val bytes = apk.readBytes()
         val artifact = BundledLauncherPin(OneBlob(PinnedLauncher.ASSET_NAME, bytes)).bundled()
         assertEquals(PackageName("com.gathin.tvhome"), artifact.pkg)
-        assertEquals(10L, artifact.versionCode)
-        assertEquals("3.0-thomas.1", artifact.versionName)
+        assertEquals(11L, artifact.versionCode)
+        assertEquals("3.0-thomas.2", artifact.versionName)
         assertEquals(Sha256(PinnedLauncher.SHA256), artifact.sha256)
         assertEquals(Sha256(PinnedLauncher.SIGNER_SHA256), artifact.signer)
         assertEquals(artifact.sha256, artifact.blob.sha256)
