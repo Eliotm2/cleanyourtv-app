@@ -419,14 +419,19 @@ class DefaultPlanner(
                 return false   // the pin (or a newer build of ours) is already installed
             }
             installApk(artifact.blob, artifact.sha256, artifact.pkg, artifact.versionCode, artifact.signer,
-                present = present && !replacesLauncher, group = GROUP_LAUNCHER, narration = "Installing the new home screen")
+                present = present && !replacesLauncher, group = GROUP_LAUNCHER, narration = "Installing the new home screen",
+                priorUnknown = replacesLauncher)
             return true
         }
 
         // `quiet` (RFC-CURTAIN-1): the helper steps around the install carry a blank narration, so
         // only the install itself is a line on the Working screen.
-        fun installApk(blob: BlobRef, sha256: Sha256, pkg: PackageName, versionCode: Long, signer: Sha256, present: Boolean, group: String, narration: String, quiet: Boolean = false) {
-            val prior = Prior(present = present)
+        fun installApk(blob: BlobRef, sha256: Sha256, pkg: PackageName, versionCode: Long, signer: Sha256, present: Boolean, group: String, narration: String, quiet: Boolean = false,
+            priorUnknown: Boolean = false) {
+            // Fork (Thomas): after an Uninstall in the same plan the package is still on the TV when the
+            // engine rechecks the priors before the first step, so a "present = false" prior read as a
+            // stale plan (pause, replan, the same plan again: a loop on the TCL G08). Unknown instead.
+            val prior = if (priorUnknown) Prior() else Prior(present = present)
             fun helper(text: String) = if (quiet) "" else text
             if ("cmd" in snapshot.facts.adbFeatures) {
                 step(Op.InstallStream(blob, sha256, pkg, versionCode, signer), prior, group, narration, FailurePolicy.CONTINUE)

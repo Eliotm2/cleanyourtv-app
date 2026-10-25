@@ -20,7 +20,9 @@ Identifiant d'appli `fr.thomas.cleanyourtv` (amont : `tv.cleanyour.app`), nom «
   amont déjà installé ; l'amont laissait alors la copie en place et l'installation échouait
   (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), bascule annulée. Le fork traite une clé illisible comme une autre clé : la copie
   est désinstallée d'abord, aux mêmes conditions (accueil d'origine aux commandes, règle D36). `SetupMachine` pose le
-  consentement et `DefaultPlanner.launcherInstall` ajoute l'étape.
+  consentement et `DefaultPlanner.launcherInstall` ajoute l'étape. En thomas.3, l'étape d'installation qui suit cette
+  désinstallation ne déclare plus « absent avant » : la relecture du moteur au lancement voyait l'ancienne copie encore
+  là, jugeait le plan périmé et l'appli rebouclait sur un nouveau plan.
 - **Vérification de mise à jour** désactivée (`Store.updateChecker` répond « couldn't check ») : une version amont
   ne pourrait pas s'installer par-dessus cette clé.
 - Chaînes du fork en anglais et en français (`feature/manage/res/values-fr`) ; le reste de l'appli reste en anglais.

@@ -309,6 +309,11 @@ class PlannerTest {
         val names = ops(p).map { it::class.simpleName }
         assertTrue(names.indexOf("Uninstall") in 0 until names.indexOf("InstallStream"), names.toString())
         assertTrue(p.summary.replacesLauncher)
+        // The install after the uninstall carries no "absent before" prior: the engine's pre-plan recheck
+        // sees the old copy still there and would otherwise call the plan stale (a replan loop).
+        val install = p.steps.single { it.op is Op.InstallStream }
+        assertEquals(null, install.prior?.present)
+        assertEquals(true, p.steps.single { it.op is Op.Uninstall }.prior?.present)
     }
 
     // Fork (Thomas): an APK picked on the phone takes the module's install path, with the file's own
