@@ -65,6 +65,10 @@
 
     <!-- M2 Update the home screen (D4): a newer build of our home screen, installed over the old one -->
     <string name="home_row_update">Update the home screen</string>
+    <!-- Fork (Thomas): TCL auto-start permission for the launcher's remote-button helper -->
+    <string name="home_row_auto_start">Remote buttons after a restart (TCL)</string>
+    <string name="home_row_auto_start_note">Lets the home screen\'s "Home button" helper start at boot, so the remote buttons set on the TV keep working after a restart. Switch the helper on in the TV\'s Accessibility settings first.</string>
+    <string name="home_auto_start_done">The helper may now start at boot. Restart the TV to check.</string>
     <string name="home_row_update_note">Version {version} is ready. Your dock and look stay as they are.</string>
     <string name="home_update_preview_title">Update the home screen?</string>
     <string name="home_update_preview_body">We\'ll install version {version} over the one on the TV. The dock, the look and the card answers stay. If it is the TV\'s home screen now, it restarts once.</string>

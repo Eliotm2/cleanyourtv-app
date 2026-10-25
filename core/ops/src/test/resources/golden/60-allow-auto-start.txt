@@ -1,0 +1,11 @@
+# Let the launcher's services start at boot (TCL app-op)
+op: AllowAutoStart pkg=com.gathin.tvhome
+privilege: PROFILE_STEP
+timeout_ms: 30000
+stdout_cap: 65536
+line: 'sh' '-c' 'appops set --user 0 com.gathin.tvhome AUTO_START allow || appops set --user 0 com.gathin.tvhome APP_AUTO_START allow; appops write-settings'
+transfer: none
+verify: Read kind=PACKAGES
+verify_line: 'pm' 'list' 'packages' '-f'
+prior: none
+inverse: none

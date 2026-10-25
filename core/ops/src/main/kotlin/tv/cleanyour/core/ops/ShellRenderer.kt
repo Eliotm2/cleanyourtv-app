@@ -89,6 +89,11 @@ class ShellRenderer(private val watchdogVariant: WatchdogVariant = WatchdogVaria
         is Op.SetHome -> Rendered(op, lines(line(CMD, "package", "set-home-activity", USER, "0", comp(op.component))), null,
             Privilege.TAKEOVER, Op.Read(ProbeKind.HOME), T_DEFAULT, CAP_DEFAULT)
         is Op.VerifyHome -> { comp(op.expected); Rendered(op, lines(line(*HOME_ARGV)), null, Privilege.READ, null, T_DEFAULT, CAP_DEFAULT) }
+        // Fork (Thomas): one sh -c line, as the watchdog: the op name differs by firmware (AUTO_START on the TCL G08 Google TV
+        // 14 builds, APP_AUTO_START on older ones), so the second is tried when the first is refused; then the ops are
+        // written to disk, which Android otherwise does lazily and loses at a restart soon after.
+        is Op.AllowAutoStart -> Rendered(op, lines(line("sh", "-c", autoStartScript(writePkg(op.pkg)))), null, Privilege.PROFILE_STEP,
+            Op.Read(ProbeKind.PACKAGES), T_PM, CAP_DEFAULT)
         is Op.ArmHomeWatchdog -> {
             // A token file left by an earlier run of the same plan would defuse this watchdog from
             // the start, so it is removed first (R1); then the template, the one multi-command line.
@@ -211,8 +216,12 @@ class ShellRenderer(private val watchdogVariant: WatchdogVariant = WatchdogVaria
         is Op.PushAsset -> if (prior.present == false) Op.RemoveFile(op.dest) else null
         is Op.Uninstall, is Op.RemoveFile, is Op.RestartHome, is Op.StartActivity, is Op.Mkdir,
         is Op.ConfirmHome, is Op.KillWatchdog, is Op.VerifyHome, is Op.Read, is Op.Settle,
-        Op.PressHome, Op.Reboot, Op.DebugOff, is Op.CurtainCue -> null
+        Op.PressHome, Op.Reboot, Op.DebugOff, is Op.CurtainCue, is Op.AllowAutoStart -> null
     }
+
+    /** Fork (Thomas): the AllowAutoStart script, one sh -c token; pkg already passed writePkg (no quote can be in it). */
+    private fun autoStartScript(pkg: String): String =
+        "appops set --user 0 $pkg AUTO_START allow || appops set --user 0 $pkg APP_AUTO_START allow; appops write-settings"
 
     override fun check(op: Op, verifyOutput: String, prior: Prior?): VerifyResult {
         val lines = verifyOutput.lines().map { it.trim() }.filter { it.isNotEmpty() }
@@ -249,7 +258,7 @@ class ShellRenderer(private val watchdogVariant: WatchdogVariant = WatchdogVaria
             is Op.StartActivity -> if (!op.wait || ("Status: ok" in lines && lines.none { it.startsWith("Error") })) VerifyResult.Ok
                 else mismatch("Status: ok and no Error from am start -W")
             is Op.Mkdir, is Op.RestartHome, is Op.Read, is Op.Settle,
-            Op.PressHome, Op.Reboot, Op.DebugOff, is Op.CurtainCue -> VerifyResult.Ok
+            Op.PressHome, Op.Reboot, Op.DebugOff, is Op.CurtainCue, is Op.AllowAutoStart -> VerifyResult.Ok
         }
     }
 

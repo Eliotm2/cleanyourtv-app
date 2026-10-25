@@ -72,6 +72,7 @@ object LogCodes {
         is Op.Settle -> "Settle"
         Op.Reboot -> "Reboot"
         Op.DebugOff -> "DebugOff"
+        is Op.AllowAutoStart -> "AllowAutoStart ${op.pkg.value}"
         is Op.CurtainCue -> "CurtainCue ${op.stage.name.lowercase()}"
     }
 

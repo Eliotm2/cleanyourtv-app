@@ -238,7 +238,7 @@ class RestoreCommandsTest {
         assertTrue(interrupted.none { it.change.op is Op.CurtainCue || it.change.op is Op.StartActivity }, interrupted.toString())
         val removal = interrupted.single { it.inverse == Op.Uninstall(curtain) }
         assertEquals(RestoreStepKind.REMOVE_APP, removal.kind)
-        assertEquals(listOf("'pm' 'uninstall' '--user' '0' 'tv.cleanyour.curtain'"), removal.lines)
+        assertEquals(listOf("'pm' 'uninstall' 'tv.cleanyour.curtain'"), removal.lines)
 
         val finished = RestoreCommands(renderer).steps(run + ChangeRecord(plan, 5, Op.Uninstall(curtain), Prior(present = true), 6))
         assertTrue(finished.none { it.change.op.let { op -> op is Op.CurtainCue || DefaultPlanner.packageOf(op) == curtain } }, finished.toString())

@@ -107,6 +107,7 @@ object ChangeJson {
             is Op.Settle -> put("seconds", op.seconds)
             Op.Reboot -> {}
             Op.DebugOff -> {}
+            is Op.AllowAutoStart -> put("pkg", op.pkg.value)
             is Op.CurtainCue -> {
                 put("receiver", op.receiver.flat); put("token", op.token.value); put("stage", op.stage.name)
                 put("count", op.count); put("total", op.total); put("group", op.group.name); put("groupCount", op.groupCount); put("groupTotal", op.groupTotal)
@@ -140,6 +141,7 @@ object ChangeJson {
         "settle" -> Op.Settle(o.int("seconds"))
         "reboot" -> Op.Reboot
         "debug_off" -> Op.DebugOff
+        "allow_auto_start" -> Op.AllowAutoStart(PackageName(o.str("pkg")))
         "curtain_cue" -> Op.CurtainCue(component(o.str("receiver")), RunToken(o.str("token")), CurtainStage.valueOf(o.str("stage")),
             o.int("count"), o.int("total"), CurtainGroup.valueOf(o.str("group")), o.int("groupCount"), o.int("groupTotal"))
         else -> throw IllegalArgumentException("unknown op type $type")
@@ -168,6 +170,7 @@ object ChangeJson {
         is Op.Settle -> "settle"
         Op.Reboot -> "reboot"
         Op.DebugOff -> "debug_off"
+        is Op.AllowAutoStart -> "allow_auto_start"
         is Op.CurtainCue -> "curtain_cue"
     }
 

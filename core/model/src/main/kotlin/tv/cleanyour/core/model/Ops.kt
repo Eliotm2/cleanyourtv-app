@@ -49,6 +49,9 @@ sealed interface Op {
     data class Settle(val seconds: Int) : Op                        // phone-side sleep, renders no line; 1 to 60
     data object Reboot : Op
     data object DebugOff : Op
+    // Fork (Thomas): let a sideloaded app's services start at boot on TCL firmware (appops AUTO_START / APP_AUTO_START
+    // allow, then appops write-settings). Needed for the launcher's remote-button helper to bind after a reboot.
+    data class AllowAutoStart(val pkg: PackageName) : Op
     // RFC-CURTAIN-1: one am broadcast to the curtain's receiver. count and total are the switch-offs
     // over the whole plan, groupCount and groupTotal those of `group`; every number is 0 to 999.
     data class CurtainCue(val receiver: Component, val token: RunToken, val stage: CurtainStage, val count: Int, val total: Int,

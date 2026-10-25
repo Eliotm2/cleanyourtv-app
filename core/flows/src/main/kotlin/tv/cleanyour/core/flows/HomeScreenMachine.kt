@@ -68,6 +68,7 @@ sealed interface HomeScreenIntent {
     data object UpdateHomeScreen : HomeScreenIntent    // D4
     data object RunSetupAgain : HomeScreenIntent       // 0.3.3 D2, NotOnTv.setupAgain
     data object HelpAddTv : HomeScreenIntent           // 0.3.3 D2, NotOnTv.helpAddTv
+    data object AllowAutoStart : HomeScreenIntent      // fork (Thomas): TCL auto-start permission for the launcher
 }
 
 class HomeScreenMachine(
@@ -112,6 +113,7 @@ class HomeScreenMachine(
             HomeScreenIntent.UseStock -> after.stock?.let { stock -> scope.launch { useStock(stock) } }
             HomeScreenIntent.PreviewUpdate -> scope.launch { previewUpdate() }
             HomeScreenIntent.UpdateHomeScreen -> scope.launch { update() }
+            HomeScreenIntent.AllowAutoStart -> scope.launch { allowAutoStart() }
             HomeScreenIntent.RunSetupAgain -> if (after.notOnTv?.setupAgain == true) effect(ManageEffect.Navigate("setup/${tvId.value}"))
             HomeScreenIntent.HelpAddTv -> if (after.notOnTv?.helpAddTv == true) effect(ManageEffect.Navigate("report/tv/${tvId.value}"))
             else -> {}
@@ -209,6 +211,18 @@ class HomeScreenMachine(
                 effect(ManageEffect.Snackbar(SnackKind.HOME_UPDATED, pin.versionName, false))
             }
             r is WriteResult.GateCancelled || r is WriteResult.NoTv || r is WriteResult.Paused -> {}   // Paused: the open-run card (O2)
+            else -> effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false))
+        }
+        load()
+    }
+
+    // Fork (Thomas): the AllowAutoStart plan, gated and journaled like the update.
+    private suspend fun allowAutoStart() {
+        val r = writer.write(tvId, PlanRequest.AllowLauncherAutoStart, fresh = true) { send(BusyNow(it)) }
+        send(BusyNow(null))
+        when {
+            r is WriteResult.Done && r.finished.status == RunStatus.COMPLETED -> effect(ManageEffect.Snackbar(SnackKind.AUTO_START_ALLOWED, "", false))
+            r is WriteResult.GateCancelled || r is WriteResult.NoTv || r is WriteResult.Paused -> {}
             else -> effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false))
         }
         load()

@@ -108,6 +108,8 @@ object GoldenCases {
         GoldenCase("57-cue-install", "Curtain cue: the new home screen is being installed", cue(CurtainStage.INSTALL), null),
         GoldenCase("58-cue-installed", "Curtain cue: the new home screen is installed", cue(CurtainStage.INSTALLED), null),
         GoldenCase("59-cue-finale", "Curtain cue: the finale, before Home switches over", cue(CurtainStage.FINALE), null),
+        // Fork (Thomas): the TCL auto-start permission for the launcher's helper.
+        GoldenCase("60-allow-auto-start", "Let the launcher's services start at boot (TCL app-op)", Op.AllowAutoStart(launcher.pkg), null),
     )
 }
 
@@ -142,6 +144,7 @@ object GoldenText {
         is Op.Settle -> "Settle seconds=${op.seconds}"
         Op.Reboot -> "Reboot"
         Op.DebugOff -> "DebugOff"
+        is Op.AllowAutoStart -> "AllowAutoStart pkg=${op.pkg.value}"
         is Op.CurtainCue -> "CurtainCue receiver=${op.receiver.flat} token=${op.token.value} stage=${op.stage.name} count=${op.count} total=${op.total} group=${op.group.name} groupCount=${op.groupCount} groupTotal=${op.groupTotal}"
     }
 

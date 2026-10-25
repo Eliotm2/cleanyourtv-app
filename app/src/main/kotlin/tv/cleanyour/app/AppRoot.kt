@@ -351,6 +351,7 @@ object SnackText {
         SnackKind.KEPT_ON -> tv.cleanyour.feature.setup.R.string.done_skipped to mapOf("name" to e.name)
         SnackKind.RUN_BUSY -> tv.cleanyour.feature.manage.R.string.tvsettings_forget_busy to emptyMap()
         SnackKind.RUN_BUSY_ANY -> tv.cleanyour.feature.manage.R.string.appsettings_delete_all_busy to mapOf("tv" to e.name)
+        SnackKind.AUTO_START_ALLOWED -> tv.cleanyour.feature.launcher.R.string.home_auto_start_done to emptyMap()
     }
 }
 

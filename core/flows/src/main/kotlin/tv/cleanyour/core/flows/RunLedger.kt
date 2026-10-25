@@ -177,7 +177,7 @@ class RunLedger(private val store: DocumentStore, private val journal: Journal) 
         private fun mustSucceed(op: Op): Boolean = op is Op.Enable || op is Op.SetHome || op is Op.VerifyHome
 
         fun isChange(op: Op): Boolean = when (op) {
-            is Op.Read, is Op.VerifyHome, is Op.Settle, Op.PressHome, is Op.CurtainCue -> false
+            is Op.Read, is Op.VerifyHome, is Op.Settle, Op.PressHome, is Op.CurtainCue, is Op.AllowAutoStart -> false
             else -> true
         }
 

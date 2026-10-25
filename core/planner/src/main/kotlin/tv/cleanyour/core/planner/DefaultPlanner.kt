@@ -99,6 +99,7 @@ class DefaultPlanner(
             PlanRequest.Reboot -> { d.reboot(); PlanKind.REBOOT }
             is PlanRequest.UpdateLauncher -> { d.updateLauncher(request.launcher); PlanKind.UPDATE_LAUNCHER }
             is PlanRequest.InstallApk -> { d.installUserApk(request); PlanKind.INSTALL_APK }
+            PlanRequest.AllowLauncherAutoStart -> { d.allowLauncherAutoStart(); PlanKind.ALLOW_AUTO_START }
         }
         if (d.reasons.isNotEmpty()) return PlanResult.Refused(d.reasons.toList())
         val steps = d.steps.toList()
@@ -648,6 +649,15 @@ class DefaultPlanner(
             installApk(req.apk, info.sha256, info.pkg, info.versionCode, info.signer,
                 present = current != null, group = GROUP_MODULE, narration = "Installing ${req.label} on the TV")
             step(Op.PressHome, null, GROUP_MODULE, "Showing the home screen", FailurePolicy.CONTINUE)
+        }
+
+        // Fork (Thomas): TCL Google TV 14 (G08) refuses to bind a sideloaded app's accessibility service at boot
+        // ("TclAppBoot forbid bind service", upstream TROUBLESHOOTING), so the launcher's remote-button helper dies at
+        // every restart. The app-op AUTO_START (APP_AUTO_START on older builds) set to allow and written to disk lets
+        // it bind on its own. Only for the launcher, only when it is installed.
+        fun allowLauncherAutoStart() {
+            if (!installed(launcher.pkg)) { refuse("the new home screen is not on this TV"); return }
+            step(Op.AllowAutoStart(launcher.pkg), null, GROUP_LAUNCHER, "Letting the home screen's remote-button helper start at boot", FailurePolicy.CONTINUE)
         }
 
         fun removeModule(pkg: PackageName) {
