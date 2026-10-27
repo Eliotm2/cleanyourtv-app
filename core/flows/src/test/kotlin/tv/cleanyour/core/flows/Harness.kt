@@ -69,7 +69,6 @@ val miProfile = Profile(
 // Every fake wired the way the app wires the real things.
 class Harness(val clock: FakeClock = FakeClock(Samples.NOW_MS), val facts: tv.cleanyour.core.spec.FactsTable = MapFactsTable()) {
     init {
-        ForkLook.columns = 4   // fork (Thomas): the upstream expectations below assume 4 tiles a row
     }
     val discovery = FakeDiscovery()
     val session = FakeTvSession()
@@ -125,7 +124,8 @@ class Harness(val clock: FakeClock = FakeClock(Samples.NOW_MS), val facts: tv.cl
     fun setupDeps(dock: DockPicker = DockPicker { _, _, _, _, _ -> listOf(PackageName("com.netflix.ninja")) }, curtainPin: tv.cleanyour.core.trust.CurtainPin? = null,
                   savedWifi: tv.cleanyour.core.probe.SavedWifiOwners? = null, store: StoreRules = StoreRules.FULL,
                   candidates: CandidateLists? = null, diagnostics: Diagnostics = Diagnostics { "diagnostics" },
-                  about: AppAbout? = null, connectDetail: () -> String? = { null }) = SetupDeps(
+                  about: AppAbout? = null, connectDetail: () -> String? = { null },
+                  themes: tv.cleanyour.core.spec.ThemeSource = this.themes) = SetupDeps(
         discovery, sessions, prober, profiles, facts, runner, engine, gate, tvs, snapshots, ledger,
         FakeLauncherPin(Samples.launcherArtifact()), themes, restorePoint, FakeRestoreNote(), sessionEnd, access, clock, KeyCopy,
         blobs = blobs, dock = dock, screenLock = { true }, diagnostics = diagnostics,
@@ -139,6 +139,7 @@ class Harness(val clock: FakeClock = FakeClock(Samples.NOW_MS), val facts: tv.cl
         candidates = candidates,
         about = about,
         connectDetail = connectDetail,
+        documents = documents,
     )
 
     fun setup(scope: CoroutineScope, start: SetupStart = SetupStart.Fresh, store: StoreRules = StoreRules.FULL) = SetupMachine(setupDeps(store = store), scope, start)
@@ -194,6 +195,7 @@ class Harness(val clock: FakeClock = FakeClock(Samples.NOW_MS), val facts: tv.cl
         is tv.cleanyour.core.planner.PlanRequest.WriteRestorePoint -> PlanKind.WRITE_RESTORE_POINT
         tv.cleanyour.core.planner.PlanRequest.Reboot -> PlanKind.REBOOT
         is tv.cleanyour.core.planner.PlanRequest.InstallApk -> PlanKind.INSTALL_APK   // fork (Thomas)
+        tv.cleanyour.core.planner.PlanRequest.AllowLauncherAutoStart -> PlanKind.ALLOW_AUTO_START   // fork (Thomas)
         is tv.cleanyour.core.planner.PlanRequest.UpdateLauncher -> PlanKind.UPDATE_LAUNCHER
     }
 }

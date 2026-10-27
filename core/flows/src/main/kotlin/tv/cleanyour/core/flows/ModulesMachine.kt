@@ -19,6 +19,7 @@ import tv.cleanyour.core.registry.FetchFailure
 import tv.cleanyour.core.registry.FetchResult
 import tv.cleanyour.core.registry.IndexState
 import tv.cleanyour.core.session.TvSession
+import tv.cleanyour.core.spec.DockLayers
 import tv.cleanyour.core.trust.IndexFailure
 
 // M3 Cards and modules, M3a Add, M3b detail, M3c the card prompt mirror (UX 5, D1, D6, D45, F9).
@@ -183,9 +184,24 @@ class ModulesMachine(
         if (tv.launcher == null) return null
         val choice = d.homePrefs.load(tvId)
         if (Cards.current(d, tvId, choice, overlay)) return null
-        val theme = choice?.themeId?.let { id -> d.themes.bundled().firstOrNull { it.id == id } }
-        val look = Look.encode(d.encoder, d.blobs, theme, choice?.dock.orEmpty(), cards = true)
-        return look to HomeChoice(look.doc.dockApps.orEmpty(), theme?.id, cards = true)
+        // look2: a choice in the new form is pushed in its own form, on this TV.
+        if (choice?.isNew == true) {
+            val snap = d.snapshots.latest(tvId)
+            val packages = snap?.packages.orEmpty()
+            val liveTv = d.profileOf(tv)?.liveTv
+            val lookTv = LookTv(packages[Launcher.pkg]?.versionCode, snap?.facts?.ramMb?.takeIf { it > 0 },
+                snap == null || snap.hdmi.isNotEmpty() || liveTv?.let { it in packages } == true)
+            val drafts = LookDrafts(d.themes, d.pictures, d.encoder, d.clock)
+            val (doc, wallpaper) = drafts.docOf(choice, choice.dock, cards = true, OwnPicture.ref(d, tvId), lookTv)
+            return Look.encode(d.encoder, d.blobs, doc, wallpaper) to choice.copy(dock = DockLayers.keep(choice.dock), cards = true)
+        }
+        // 0.4.0: once a dated look has ended, the look before it (HomeChoice.lookOn).
+        val theme = choice?.lookOn(d.clock.today())?.let { id -> d.themes.bundled().firstOrNull { it.id == id } }
+        // 0.4.0: with the person's apps in a row, and the whole saved order kept (DockLayers.keep),
+        // not only the part the TV shows.
+        val look = Look.encode(d.encoder, d.blobs, theme, choice?.dock.orEmpty(), cards = true, OwnPicture.lookPicture(d, tvId, choice?.picture, choice?.dim),
+            choice?.columns)
+        return look to (choice ?: HomeChoice(emptyList(), null)).withTheme(theme?.id, DockLayers.keep(choice?.dock.orEmpty()), cards = true)
     }
 
     private suspend fun keepCardsOn(pushed: Pair<Look, HomeChoice>) {

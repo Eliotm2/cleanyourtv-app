@@ -57,24 +57,22 @@ class FullStoreTest {
         for (h in DownloadHosts.ALL) assertTrue(DownloadHosts.isAllowed("https://$h/x", Store.hosts), h)
     }
 
-    @Test fun theUpdateCheckAsksGithubForTheLatestRelease() = runBlocking {
-        val newer = OneAnswer(200, """{"tag_name": "v0.4.0", "name": "x"}""")
-        // Fork (Thomas): the fork's own checker never offers a release; the upstream one is kept for reference.
-        assertEquals(null, Store.updateChecker(newer).latestNewerThan("0.3.0"))
-        assertEquals("0.4.0", Store.upstreamUpdateChecker(newer).latestNewerThan("0.3.0"))
-        assertEquals(listOf(Store.RELEASES_URL), newer.urls)
-        assertEquals("", Store.upstreamUpdateChecker(OneAnswer(200, """{"tag_name":"v0.3.0"}""")).latestNewerThan("0.3.0"))
-        assertEquals(null, Store.upstreamUpdateChecker(OneAnswer(404, "")).latestNewerThan("0.3.0"))
-        assertEquals("https://github.com/udhaykumarbala/cleanyourtv-app/releases", Store.releasePage)
+    // Fork (Thomas): the check reads the fork's own releases, signed with the fork's key.
+    @Test fun theUpdateCheckAsksTheForksLatestRelease() = runBlocking {
+        val newer = OneAnswer(200, """{"tag_name": "v0.4.0-thomas.2", "name": "x"}""")
+        assertEquals("0.4.0-thomas.2", Store.updateChecker(newer).latestNewerThan("0.4.0-thomas.1"))
+        assertEquals(listOf("https://api.github.com/repos/Eliotm2/cleanyourtv-app/releases/latest"), newer.urls)
+        assertEquals("", Store.updateChecker(OneAnswer(200, """{"tag_name":"v0.4.0-thomas.1"}""")).latestNewerThan("0.4.0-thomas.1"))
+        assertEquals(null, Store.updateChecker(OneAnswer(404, "")).latestNewerThan("0.4.0-thomas.1"))
+        assertEquals("https://github.com/Eliotm2/cleanyourtv-app/releases/latest", Store.releasePage)
     }
 
-    // Test build: 0.3.5-test1 is offered 0.3.5 and later, never the 0.3.4 it installs over.
-    @Test fun aTestBuildIsOfferedOnlyANewerRelease() = runBlocking {
-        fun latest(tag: String, current: String) = runBlocking { Store.upstreamUpdateChecker(OneAnswer(200, "{\"tag_name\":\"v$tag\"}")).latestNewerThan(current) }
-        assertEquals("", latest("0.3.4", "0.3.5-test1"))
-        assertEquals("0.3.5", latest("0.3.5", "0.3.5-test1"))
-        assertEquals("0.4.0", latest("0.4.0", "0.3.5-test1"))
-        assertEquals("0.3.4", latest("0.3.4", "0.3.3"))
+    @Test fun theUpstreamVersionComesFirstThenTheForksNumber() {
+        assertTrue(Store.forkNewer("0.4.1-thomas.1", "0.4.0-thomas.9"))
+        assertTrue(Store.forkNewer("0.4.0-thomas.10", "0.4.0-thomas.9"))
+        assertTrue(Store.forkNewer("0.4.0-thomas.1", "0.3.7-thomas.9"))
+        assertTrue(!Store.forkNewer("0.3.7-thomas.9", "0.4.0-thomas.1"))
+        assertTrue(!Store.forkNewer("0.4.0", "0.4.0-thomas.1"))
     }
 
     @Test fun softwareUpdatesStayTheOwnersChoice() {

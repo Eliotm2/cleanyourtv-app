@@ -6,6 +6,7 @@ import tv.cleanyour.core.model.PackageName
 import tv.cleanyour.core.model.Profile
 import tv.cleanyour.core.model.Sha256
 import java.security.MessageDigest
+import java.time.LocalDate
 
 private fun resourceBytes(path: String): ByteArray? = BundledProfileSource::class.java.getResourceAsStream(path)?.use { it.readBytes() }
 
@@ -108,30 +109,79 @@ class BundledFactsTable(private val facts: Map<PackageName, PackageFacts> = bund
 }
 
 // The three upstream themes, copied from the pinned submodule into the :core:spec resources at
-// build time. A wallpaper is a bundled asset: BlobRef.path is "bundled:" plus the resource path,
-// and bytes(blob) reads it back.
-class BundledThemeSource : ThemeSource {
+// build time, then the app's own looks (0.4.0), kept in this module's resources under looks/. Each
+// look's config.json sets every layout and motion key outright, so a new look never keeps one from
+// the last. A wallpaper is a bundled asset: BlobRef.path is "bundled:" plus the resource path, and
+// bytes(blob) reads it back. Dated looks are in the list after their last day too (a saved choice
+// still names them); the flows offer only what Looks.offered allows.
+// The pictures (PictureSource) are Aurora's, from the submodule, Glass and Ruska (shown as Navy and
+// Autumn lake, the ids stay "glass" and "ruska"), from later upstream releases (MIT), kept in this
+// module's resources under pictures/, and (look2) the pictures of the app's own looks.
+class BundledThemeSource : ThemeSource, PictureSource {
     override fun bundled(): List<Theme> = themes
+
+    override fun pictures(): List<Picture> = gallery
+
+    private class Entry(val id: String, val name: String, val description: String, val dir: String)
 
     companion object {
         const val PREFIX = "bundled:"
-        private const val DIR = "/tv/cleanyour/core/spec/themes"
+        private const val THEMES = "/tv/cleanyour/core/spec/themes"
+        private const val LOOKS = "/tv/cleanyour/core/spec/looks"
+        private const val PICTURES = "/tv/cleanyour/core/spec/pictures"
         private val catalogue = listOf(
-            Triple("default", "Default", "Black, four tiles a row, the dock at the very bottom."),
-            Triple("aurora", "Aurora", "A dark aurora picture on navy behind the apps."),
-            Triple("six-columns", "Six columns", "Six smaller tiles a row, one row showing under the dock."),
+            Entry("default", "Default", "Black, four tiles a row, the dock at the very bottom.", THEMES),
+            Entry("aurora", "Aurora", "A dark aurora picture on navy behind the apps.", THEMES),
+            Entry("six-columns", "Six columns", "Six smaller tiles a row, and a row under the dock once it holds more than six apps.", THEMES),
+            Entry("cinema", "Cinema", "Velvet curtains around a dark stage, and the focused app's name in large type.", LOOKS),
+            Entry("console", "Console", "Seven small tiles, a big name and deep cobalt light.", LOOKS),
+            Entry("horizon", "Horizon", "Mountain ridges under a sky that changes with the hour: blue by day, warm at sunrise and sunset, dark at night.", LOOKS),
+            Entry("quiet", "Quiet black", "Pure black and nothing else, calm motion. Good for OLED and slow TVs.", LOOKS),
+            Entry("diwali", "Diwali", "Lamps, a gold rangoli and festive icons, until 10 November.", LOOKS),
+            Entry("library", "Library", "Every app on one calm page, no dock band, warm lamp light.", LOOKS),
+            Entry("arcade", "Arcade", "A neon sun over a glowing grid, and tiles that bounce.", LOOKS),
+            Entry("mist", "Mist", "Soft out of focus light in indigo, teal and peach.", LOOKS),
         )
 
         val themes: List<Theme> by lazy {
-            catalogue.map { (id, name, description) ->
-                val config = resourceBytes("$DIR/$id/config.json") ?: error("theme $id missing from the :core:spec resources")
+            catalogue.map { e ->
+                val id = e.id
+                val config = resourceBytes("${e.dir}/$id/config.json") ?: error("theme $id missing from the :core:spec resources")
                 val doc = when (val r = LauncherConfigCodec.decode(config)) {
                     is DecodeResult.Ok -> r.doc
                     is DecodeResult.Rejected -> error("bundled theme $id does not decode: ${r.reason}")
                 }
-                val wallpaperPath = "$DIR/$id/wallpaper.jpg"
+                val wallpaperPath = "${e.dir}/$id/wallpaper.jpg"
                 val wallpaper = resourceBytes(wallpaperPath)?.let { BlobRef(sha256(it), it.size.toLong(), PREFIX + wallpaperPath.removePrefix("/")) }
-                Theme(id, name, description, doc, wallpaper)
+                Theme(id, e.name, e.description, doc, wallpaper)
+            }
+        }
+
+        // look2 (spec 6.2): every picture of today's looks, each with its background colour; no new
+        // image bytes. The 0.4.0 ids stay (aurora, glass shown as Navy, ruska shown as Autumn lake).
+        // Diwali is a dated picture with its festival keys, offered up to its last day.
+        private class GalleryEntry(val id: String, val name: String, val path: String, val background: Int, val until: LocalDate? = null,
+            val festival: String? = null, val accent: String? = null, val sky: Int = 0)
+
+        private val galleryEntries = listOf(
+            GalleryEntry("diwali", "Diwali", "$LOOKS/diwali/wallpaper.jpg", 0xFF120809.toInt(), until = LocalDate.of(2026, 11, 10),
+                festival = "diwali", accent = "#FFB23C"),
+            GalleryEntry("aurora", "Aurora", "$THEMES/aurora/wallpaper.jpg", 0xFF070A14.toInt()),
+            GalleryEntry("mist", "Mist", "$LOOKS/mist/wallpaper.jpg", 0xFF0E1022.toInt()),
+            GalleryEntry("glass", "Navy", "$PICTURES/glass.jpg", 0xFF090C14.toInt()),      // the launcher's Glass picture, named for what it shows
+            GalleryEntry("ruska", "Autumn lake", "$PICTURES/ruska.jpg", 0xFF07080D.toInt()),   // the launcher's Ruska, named for what it shows
+            GalleryEntry("curtains", "Curtains", "$LOOKS/cinema/wallpaper.jpg", 0xFF07060A.toInt()),
+            GalleryEntry("mountains", "Mountains", "$LOOKS/horizon/wallpaper.jpg", 0xFF000000.toInt(), sky = 55),
+            GalleryEntry("lamp", "Lamp light", "$LOOKS/library/wallpaper.jpg", 0xFF141210.toInt()),
+            GalleryEntry("neon", "Neon", "$LOOKS/arcade/wallpaper.jpg", 0xFF0B0614.toInt()),
+            GalleryEntry("cobalt", "Cobalt", "$LOOKS/console/wallpaper.jpg", 0xFF020611.toInt()),
+        )
+
+        val gallery: List<Picture> by lazy {
+            galleryEntries.map { e ->
+                val b = resourceBytes(e.path) ?: error("picture ${e.id} missing from the :core:spec resources")
+                Picture(e.id, e.name, BlobRef(sha256(b), b.size.toLong(), PREFIX + e.path.removePrefix("/")), e.background, e.until,
+                    e.festival, e.accent, e.sky)
             }
         }
 

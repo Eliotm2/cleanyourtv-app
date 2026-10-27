@@ -9,6 +9,9 @@ import tv.cleanyour.core.spec.DecodeResult
 import tv.cleanyour.core.spec.DockLayers
 import tv.cleanyour.core.spec.LauncherConfigCodec
 import tv.cleanyour.core.spec.LauncherConfigDoc
+import tv.cleanyour.core.spec.LookKeys
+import tv.cleanyour.core.spec.Looks
+import tv.cleanyour.core.spec.PictureSource
 import tv.cleanyour.core.spec.Theme
 import tv.cleanyour.core.store.BlobStore
 
@@ -18,15 +21,86 @@ import tv.cleanyour.core.store.BlobStore
 // (RFC-DOCK-1), Manage's ApplyTheme and the Modules add (RFC-CARDS-1) all push what this makes, so
 // one choice is the same bytes wherever it is sent from. The wallpaper is the theme's own, when it
 // has one. module_cards is always written: `cards` is this TV's cards choice (Cards).
+// 0.4.0 `picture`: null keeps the look's own picture; LookPicture.None shows none (wallpaper false,
+// and the push removes wallpaper.jpg); LookPicture.Of shows that one, so wallpaper is forced true
+// (a look like Quiet black says false, and the picture would be pushed and not shown), the single
+// picture rather than a rotation, and its dim when it has one. A dated look (a festival) keeps its own.
+// 0.4.0 `columns`: the person's apps in a row (HomeChoice.columns), null for the look's own. It goes
+// into the look's doc before the dock is cut (DockLayers.applyTo), so rows_below_dock and dock_title
+// follow it. A dated look takes it too: apps in a row is not the picture.
+// 0.4.0 fill_dock is false in every push: a dock space the person left free stays empty on the TV
+// instead of taking the first app of the grid (launcher DockSlots.empty), so the dock holds only the
+// apps they picked, and the Look sheet's preview draws the space as empty band.
+// look2: a choice in the new form (HomeChoice.style) is built from scratch by LookKeys.build from
+// its resolved LookSpec and PictureKeys (LookRules), spec 7.1; a legacy choice (style null) keeps
+// the frozen 0.4.0 path (LegacyLook) byte for byte until the next send.
 internal class Look(val doc: LauncherConfigDoc, val digest: Sha256, val config: BlobRef, val wallpaper: BlobRef?) {
     companion object {
-        suspend fun encode(encoder: ConfigEncoder, blobs: BlobStore, theme: Theme?, dock: List<PackageName>, cards: Boolean): Look {
-            // Fork (Thomas): the look always names its columns (5 unless the theme says otherwise), so the phone's
-            // dock editor and the TV cut the rows the same way.
-            val base = (theme?.doc ?: LauncherConfigDoc()).let { it.copy(columns = it.columns ?: ForkLook.written()) }
-            val doc = DockLayers.applyTo(base, dock).copy(moduleCards = cards)
+        suspend fun encode(encoder: ConfigEncoder, blobs: BlobStore, theme: Theme?, dock: List<PackageName>, cards: Boolean, picture: LookPicture? = null,
+            columns: Int? = null): Look {
+            val (doc, wallpaper) = docOf(theme, dock, cards, picture, columns)
+            return encode(encoder, blobs, doc, wallpaper)
+        }
+
+        // A doc and its wallpaper as the push sends them, encoded and stored.
+        suspend fun encode(encoder: ConfigEncoder, blobs: BlobStore, doc: LauncherConfigDoc, wallpaper: BlobRef?): Look {
             val bytes = encoder.encode(doc)
-            return Look(doc, sha256Of(bytes), blobs.putBytes(bytes), theme?.wallpaper)
+            return Look(doc, sha256Of(bytes), blobs.putBytes(bytes), wallpaper)
+        }
+
+        // The doc and the wallpaper a 0.4.0 choice pushes, without storing anything (LegacyLook).
+        fun docOf(theme: Theme?, dock: List<PackageName>, cards: Boolean, picture: LookPicture?, columns: Int? = null): Pair<LauncherConfigDoc, BlobRef?> =
+            LegacyLook.docOf(theme, dock, cards, picture, columns)
+
+        // look2: the doc and the wallpaper of a choice in the new form: its rows resolved on this TV,
+        // then LookKeys.build (style keys, details, picture, movement, columns, fill_dock false, the
+        // dock and its rows, module_cards).
+        fun docOf(parts: LookParts, picture: LookPictureInfo, dock: List<PackageName>, cards: Boolean, tv: LookTv): Pair<LauncherConfigDoc, BlobRef?> {
+            val rows = LookRules.rows(parts, picture, DockLayers.trim(dock, parts.columns).size, tv)
+            val doc = LookKeys.build(LookRules.spec(parts, rows), LookRules.pictureKeys(picture, rows), parts.columns, dock, cards)
+            return doc to picture.wallpaper
+        }
+    }
+}
+
+// The 0.4.0 path, frozen: a saved 0.4.0 look sends exactly these bytes until the person sends a
+// new look (spec 8.2, C16), so neither the TV nor the drift check sees a change nobody made. The
+// legacy-looks fixtures (LookMigrationTest) hold it to the bytes 0.4.0 sent.
+internal object LegacyLook {
+    fun docOf(theme: Theme?, dock: List<PackageName>, cards: Boolean, picture: LookPicture?, columns: Int? = null): Pair<LauncherConfigDoc, BlobRef?> {
+        val base = DockLayers.applyTo(theme?.doc ?: LauncherConfigDoc(), dock, columns).copy(moduleCards = cards, fillDock = false)
+        return when (val p = picture.takeUnless { Looks.dated(theme?.id) }) {
+            null -> base to theme?.wallpaper
+            LookPicture.None -> base.copy(wallpaper = false, wallpaperRotationMinutes = 0) to null
+            is LookPicture.Of -> base.copy(wallpaper = true, wallpaperRotationMinutes = 0, wallpaperDim = p.dim ?: base.wallpaperDim) to p.ref
+        }
+    }
+}
+
+// The public face of Look.docOf, for the tests outside this module (the Look sheet's screenshot
+// goldens and the emulator byte dump), so they draw and send exactly the doc a push makes.
+object LookDocs {
+    fun of(theme: Theme?, dock: List<PackageName>, cards: Boolean, picture: LookPicture? = null, columns: Int? = null): Pair<LauncherConfigDoc, BlobRef?> =
+        Look.docOf(theme, dock, cards, picture, columns)
+}
+
+// The picture a look shows instead of its own (HomeChoice.picture).
+sealed interface LookPicture {
+    data object None : LookPicture
+    data class Of(val ref: BlobRef, val dim: Int? = null) : LookPicture
+
+    companion object {
+        const val NONE_ID = "none"
+        const val MINE_ID = "mine"     // the person's own photo for this TV (OwnPicture), resolved by HomeScreenMachine
+        const val NEW_ID = "new"       // a photo just made in the open Look sheet, not on the TV yet; never saved as a choice
+        const val EARLIER_ID = "earlier"   // look2: the earlier look's photo (EarlierLook), until sent; never saved as a choice
+
+        // HomeChoice.picture to the picture: null (the look's own) and an id the gallery no longer
+        // has keep the look's own.
+        fun of(id: String?, pictures: PictureSource): LookPicture? = when (id) {
+            null -> null
+            NONE_ID -> None
+            else -> pictures.pictures().firstOrNull { it.id == id }?.let { Of(it.wallpaper) }
         }
     }
 }
@@ -61,14 +135,4 @@ internal suspend fun rememberPushedLook(d: ManageDeps, tvId: TvId, digest: Sha25
     val pin = d.launcherPin.bundled()
     val l = tv.launcher ?: LauncherState(pin.versionCode, pin.signer, null, null)
     d.tvs.upsert(tv.copy(launcher = l.copy(overlayDigest = digest, ourOverlayDigest = digest)))
-}
-
-// Fork (Thomas): the forked launcher shows 5 tiles a row by default (its config.xml), not upstream's 4.
-object ForkLook {
-    const val COLUMNS = 5
-    /** The upstream tests were written for 4 a row; the test harness sets this to 4 so they keep their meaning. */
-    @Volatile var columns: Int = COLUMNS
-    fun columnsOf(doc: LauncherConfigDoc?): Int = doc?.columns?.takeIf { it in 1..8 } ?: columns
-    /** The columns written into a look that names none: only when they differ from the launcher's upstream default. */
-    fun written(): Int? = columns.takeIf { it != DockLayers.DEFAULT_COLUMNS }
 }

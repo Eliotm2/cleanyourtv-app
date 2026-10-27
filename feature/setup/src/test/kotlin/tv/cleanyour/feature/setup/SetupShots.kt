@@ -1,9 +1,28 @@
 package tv.cleanyour.feature.setup
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import tv.cleanyour.core.flows.HomeChoice
+import tv.cleanyour.core.flows.LookReason
+import tv.cleanyour.core.flows.LookRow
+import tv.cleanyour.core.flows.LookRows
+import tv.cleanyour.core.flows.LookSample
+import tv.cleanyour.core.flows.LookSamples
+import tv.cleanyour.core.flows.LookTv
+import tv.cleanyour.core.flows.StyleCard
+import tv.cleanyour.core.spec.LookKeys
+import tv.cleanyour.core.spec.Movement
+import tv.cleanyour.core.spec.StyleId
+import tv.cleanyour.ui.design.component.LookEditorNav
+import tv.cleanyour.ui.design.component.LookPage
+import tv.cleanyour.ui.design.component.SheetSurface
+import tv.cleanyour.ui.design.theme.CytTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,9 +30,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.io.ByteArrayOutputStream
+import java.time.LocalDate
 import tv.cleanyour.core.engine.NarrationLine
 import tv.cleanyour.core.engine.NarrationState
 import tv.cleanyour.core.engine.RunState
@@ -21,6 +43,11 @@ import tv.cleanyour.core.flows.AppChoice
 import tv.cleanyour.core.flows.ChipState
 import tv.cleanyour.core.flows.DoneSummary
 import tv.cleanyour.core.flows.HomeBlock
+import tv.cleanyour.core.flows.LookDocs
+import tv.cleanyour.core.flows.LookDraft
+import tv.cleanyour.core.flows.LookPicture
+import tv.cleanyour.core.flows.LookPreview
+import tv.cleanyour.core.flows.PictureOption
 import tv.cleanyour.core.flows.Finishing
 import tv.cleanyour.core.flows.NoSetupActions
 import tv.cleanyour.core.flows.NothingWhy
@@ -31,6 +58,7 @@ import tv.cleanyour.core.flows.SetupState
 import tv.cleanyour.core.flows.StopCard
 import tv.cleanyour.core.flows.StopCase
 import tv.cleanyour.core.flows.ThemeOption
+import tv.cleanyour.core.model.BlobRef
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.PackageName
 import tv.cleanyour.core.model.RunToken
@@ -41,7 +69,11 @@ import tv.cleanyour.core.planner.Plan
 import tv.cleanyour.core.planner.PlanSummary
 import tv.cleanyour.core.planner.RowSummary
 import tv.cleanyour.core.probe.ProbeStage
+import tv.cleanyour.core.spec.BundledThemeSource
+import tv.cleanyour.core.spec.DockLayers
+import tv.cleanyour.core.spec.LauncherConfigCodec
 import tv.cleanyour.testing.fixtures.Samples
+import tv.cleanyour.ui.design.component.PhotoPicker
 import tv.cleanyour.ui.design.component.UndoSnackbar
 import tv.cleanyour.ui.design.component.rememberUndoSnackbarState
 
@@ -170,6 +202,82 @@ private val customising = connected.copy(
     dock = dockApps, apps = dockApps + otherApps, themes = themes, commands = commands,
     draft = WizardDraft(3, Level.SIMPLE, emptySet(), emptySet(), null, null, false, null, NOW),
 )
+
+// 0.4.0 look step (RFC-LOOK-SETUP-1): the Look editor as SetupMachine fills it. The previews are
+// made as the machine makes them, from the bytes the push would send for the bundled looks
+// (LookDocs, so fill_dock false and the apps in a row are in them), with their real pictures read
+// from the :core:spec resources.
+private val bundledLooks = BundledThemeSource().bundled().associateBy { it.id }
+private val gallery = BundledThemeSource().pictures().associateBy { it.id }
+private fun resourcePath(ref: BlobRef?) = ref?.path?.removePrefix(BundledThemeSource.PREFIX)?.let { "/$it" }
+private val pictureFiles: Map<String, ImageBitmap> by lazy {
+    (bundledLooks.values.map { it.wallpaper } + gallery.values.map { it.wallpaper }).mapNotNull { resourcePath(it) }.distinct().associateWith { path ->
+        BitmapFactory.decodeStream(SetupShots::class.java.getResourceAsStream(path), null, BitmapFactory.Options().apply { inSampleSize = 4 })!!.asImageBitmap()
+    }
+}
+// A photo made in the look step stands in as Mist's own picture file.
+private val newPhoto = BlobRef(Samples.zeroHash, 1, resourcePath(bundledLooks.getValue("mist").wallpaper)!!)
+private fun lookPreview(id: String, picture: LookPicture.Of?, columns: Int?, dock: List<AppChoice>): LookPreview {
+    val (doc, wallpaper) = LookDocs.of(bundledLooks.getValue(id), dock.map { it.pkg }, cards = true, picture, columns)
+    val p = LookPreview.of(LauncherConfigCodec.encode(doc), null, dock.map { it.name }, LocalDate.of(2026, 10, 25), 21 * 60 + 5)
+    return p.copy(picturePath = if (doc.wallpaper != false) wallpaper?.path?.let { it.removePrefix(BundledThemeSource.PREFIX).let { r -> if (r.startsWith("/")) r else "/$r" } } else null)
+}
+// The step's draft as SetupMachine makes it: the look's own apps in a row unless `columns`.
+private fun lookDraft(id: String, picture: String? = null, columns: Int? = null, dock: List<AppChoice> = dockApps): LookDraft {
+    val own = DockLayers.columnsOf(bundledLooks.getValue(id).doc)
+    val p = when (picture) {
+        null, LookPicture.NONE_ID -> null
+        LookPicture.NEW_ID -> LookPicture.Of(newPhoto, 40)
+        else -> LookPicture.Of(gallery.getValue(picture).wallpaper)
+    }
+    val preview = if (picture == LookPicture.NONE_ID) lookPreview(id, null, columns, dock).copy(picturePath = null) else lookPreview(id, p, columns, dock)
+    return LookDraft(id, picture, false, preview, columns ?: own, own)
+}
+private fun lookStep(draft: LookDraft, dock: List<AppChoice> = dockApps, waiting: Int = 0, themeId: String = draft.themeId) = customising.copy(
+    themes = bundledLooks.values.map { ThemeOption(it.id, it.name, it.description, resourcePath(it.wallpaper)) },
+    pictures = gallery.values.map { PictureOption(it.id, it.name, resourcePath(it.wallpaper)) },
+    look = draft, dock = dock, waiting = waiting,
+    draft = customising.draft?.copy(themeId = themeId, columns = draft.columns.takeIf { it != draft.lookColumns }, picture = draft.picture),
+)
+
+// look2 look step: the same Look editor as the Look sheet, with Done. The previews come from the
+// bytes the push would send (LookSamples); the rows are written out here (a fake in test sources).
+private val lookSource = BundledThemeSource()
+private fun look2Preview(style: StyleId, picture: String, columns: Int = 5): LookPreview {
+    val choice = HomeChoice(dockApps.map { it.pkg }, null, cards = false, picture = picture, columns = columns, style = style.id, movement = Movement.LIVELY.id)
+    val p = LookSamples.preview(LookSample("setup", choice, choice.dock, LookTv(8L, 2048, false)), lookSource, lookSource, LocalDate.of(2026, 10, 26), 20 * 60 + 30)
+    return p.copy(picturePath = gallery[picture]?.let { resourcePath(it.wallpaper) }, dock = dockApps.map { it.name })
+}
+private fun look2Rows(style: StyleId, picture: String): LookRows {
+    val own = LookKeys.own(style)
+    return LookRows(
+        names = LookRow(false, true), bigName = LookRow(own.bigName, true), glow = LookRow(own.glow, true),
+        spotColour = LookRow(false, false, visible = false), ring = LookRow(own.ring, true), band = LookRow(own.band, true),
+        buttons = LookRow(own.buttons, true), greenWifi = LookRow(own.greenWifi, true),
+        dim = if (picture == LookPicture.NONE_ID) LookRow(0, false, LookReason.NO_PICTURE) else LookRow(0, true), sky = LookRow(false, true),
+        lift = LookRow(false, true), seeThrough = LookRow(50, false, LookReason.SEE_THROUGH_OFF), skyStrength = LookRow(55, false, LookReason.SKY_OFF),
+        resettable = 0, festiveRing = false, liftSlowRamMb = null,
+    )
+}
+private fun look2Draft(style: StyleId = StyleId.CLASSIC, picture: String = "mist", columns: Int = 5, newPhoto: Boolean = false, waiting: Int = 0) = LookDraft(
+    "default", picture, preview = look2Preview(style, if (newPhoto) "mist" else picture, columns), columns = columns, lookColumns = columns, style = style,
+    styleCards = StyleId.entries.map { StyleCard(it, look2Preview(it, if (newPhoto) "mist" else picture, columns), true) },
+    rows = look2Rows(style, picture), newPhoto = newPhoto, settingsFile = "{\n  \"columns\": $columns\n}", apps = dockApps.size + waiting, waiting = waiting,
+)
+private fun look2Step(draft: LookDraft) = customising.copy(
+    pictures = gallery.values.map { PictureOption(it.id, it.name, resourcePath(it.wallpaper), it.until, it.backgroundArgb) }, look = draft, dock = dockApps,
+)
+
+// The look step's sheet with a bounded height, as the modal sheet gives it.
+@Composable
+private fun LookFrame(behind: @Composable () -> Unit, page: LookPage = LookPage.MAIN, content: @Composable ColumnScope.(LookEditorNav) -> Unit) {
+    val nav = remember { LookEditorNav().apply { open(page) } }
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().clearAndSetSemantics {}) { behind() }
+        Box(Modifier.fillMaxSize().background(CytTheme.colors.scrim))
+        SheetSurface(Modifier.align(Alignment.BottomCenter).padding(top = 48.dp)) { content(nav) }
+    }
+}
 
 // The dock sheet's state as DockSheet makes it (remembered, so it survives recomposition).
 @Composable
@@ -313,7 +421,28 @@ object SetupShots {
         // The dock with a row under it, and a row just added and still empty.
         Shot("dock_sheet_rows") { SheetFrame({ Setup(found()) }) { DockContent(dockState(dockApps + otherApps.take(2)), dockApps + otherApps, {}) } },
         Shot("dock_sheet_new_row") { SheetFrame({ Setup(found()) }) { DockContent(dockState(dockApps, addRow = true), dockApps + otherApps, {}) } },
-        Shot("theme_sheet") { SheetFrame({ Setup(found()) }, maxHeight = 480.dp) { ThemeContent(customising, NoSetupActions) } },
+        // look2 look step: the same pages as the Look sheet after Setup, with Done as the footer.
+        // Classic with Mist and "Choose a photo"; More options; a photo made here ("New photo")
+        // next to the one kept for the TV ("Your photo").
+        Shot("theme_sheet", 1100.dp) {
+            LookFrame({ Setup(found()) }) { nav -> ThemeContent(look2Step(look2Draft()), NoSetupActions, PhotoPicker {}, pictureFiles, nav = nav) }
+        },
+        Shot("theme_sheet_more", 1700.dp) {
+            LookFrame({ Setup(found()) }, LookPage.MORE) { nav -> ThemeContent(look2Step(look2Draft(StyleId.GLASS)), NoSetupActions, PhotoPicker {}, pictureFiles, nav = nav) }
+        },
+        Shot("theme_sheet_photo", 1100.dp) {
+            LookFrame({ Setup(found()) }) { nav ->
+                ThemeContent(look2Step(look2Draft(picture = LookPicture.NEW_ID, newPhoto = true, waiting = 3)).copy(
+                    ownPicture = BlobRef(Samples.zeroHash, 1, resourcePath(gallery.getValue("glass").wallpaper)!!), newPicture = newPhoto, newDim = 40),
+                    NoSetupActions, PhotoPicker {}, pictureFiles, nav = nav)
+            }
+        },
+        // The Customise row names the look and its apps in a row when that is not the look's own.
+        Shot("customise_sheet_look_count", 1300.dp) {
+            SheetFrame({ Setup(found()) }, maxHeight = 1280.dp) {
+                CustomiseContent(found(), lookStep(lookDraft("console", "glass", columns = 6)), NoSetupActions, rememberUndoSnackbarState(), {}, {}, initiallyOpen = emptyList())
+            }
+        },
 
         // S4a Making it clean
         Shot("working_58") { Setup(running(narration, 58, remember { fakeShot() }), working) },

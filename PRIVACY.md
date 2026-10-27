@@ -47,6 +47,12 @@ services.
   everything can be put back. It stays on your phone. It leaves your phone only if you choose
   "Save a copy" and send the file somewhere yourself.
 - **Your choices**, such as the dock and the look you picked, and the TVs you have set up.
+- **Your own photo**, if you choose one for a TV's home screen. The app keeps one resized copy per
+  TV, with the photo's location and other details (camera, time) removed, and "Forget this TV"
+  deletes it. The photo goes only to your TV, over your own network, and is never in a report or a
+  restore point. The app uses Android's photo picker, so it sees only the one photo you pick, and it
+  asks for no photos or storage permission. On Android 9 and 10 TVs, other TV apps that have the
+  storage permission could read the picture on the TV.
 - **The app's diagnostics log.** A plain text record of what the app did (connecting, reading the
   TV, each step and how it went), with network addresses, serial numbers, keys and pairing codes
   removed. It stays on your phone. "Delete everything" in the app's Settings deletes it, and so
@@ -83,7 +89,8 @@ The app asks Android for: internet and network state (to reach the TV and, in th
 F-Droid versions, GitHub), Wi-Fi multicast (to find the TV), a foreground service while it works
 on the TV, notifications (to tell you when it is done), and your screen lock (confirmed once
 before the first change, so a stranger holding your unlocked phone cannot change your TV). It
-does not ask for location, contacts, camera, microphone, photos or storage.
+does not ask for location, contacts, camera, microphone, photos or storage (a photo for the TV
+comes through Android's photo picker, which needs no permission).
 
 ## Children
 

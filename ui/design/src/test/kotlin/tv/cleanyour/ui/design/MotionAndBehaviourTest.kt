@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,6 +27,13 @@ import tv.cleanyour.ui.design.component.CountdownRing
 import tv.cleanyour.ui.design.component.DiffItem
 import tv.cleanyour.ui.design.component.DiffRow
 import tv.cleanyour.ui.design.component.NumeralHeadline
+import tv.cleanyour.ui.design.component.PinnedPreviewSize
+import tv.cleanyour.ui.design.component.SEGMENT_HIGHLIGHT_TAG
+import androidx.compose.ui.unit.dp
+import tv.cleanyour.ui.design.component.SegmentOption
+import tv.cleanyour.ui.design.component.SegmentedChoice
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.onNodeWithContentDescription
 import tv.cleanyour.ui.design.component.UndoSnackbarHost
 import tv.cleanyour.ui.design.component.UndoSnackbarState
 import tv.cleanyour.ui.design.component.WelcomeIllustration
@@ -113,6 +121,75 @@ class MotionAndBehaviourTest {
         compose.onNodeWithText("Mi TV+ promos will be kept.").assertExists()
         compose.mainClock.advanceTimeBy(5_500)
         compose.waitForIdle()
+        assertNull(state.current)
+    }
+
+    // 0.4.0 SegmentedChoice: the one highlight slides from the old choice to the new one, about
+    // 300 ms on a short spring, and under reduced motion it is on the new one at once.
+    private fun highlightLeft() = compose.onNodeWithTag(SEGMENT_HIGHLIGHT_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left
+    private fun segmentLeft(n: Int) = compose.onNodeWithContentDescription("$n apps in a row").fetchSemanticsNode().boundsInRoot.left
+
+    private fun slide(reduced: Boolean): List<Float> {
+        var chosen by mutableStateOf("4")
+        val options = (4..8).map { SegmentOption("$it", "$it", "$it apps in a row") }
+        compose.mainClock.autoAdvance = false
+        compose.setContent { CytTheme(reducedMotion = reduced) { SegmentedChoice(options, chosen, {}) } }
+        compose.mainClock.advanceTimeBy(100)
+        val start = highlightLeft()
+        chosen = "7"
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(64)
+        val mid = highlightLeft()
+        compose.mainClock.advanceTimeBy(600)
+        return listOf(start, mid, highlightLeft(), segmentLeft(4), segmentLeft(7))
+    }
+
+    @Test
+    fun theSegmentHighlightSlidesToTheNewChoice() {
+        val (start, mid, end, four, seven) = slide(reduced = false)
+        assertEquals(four, start, 1f)
+        assertTrue("mid-slide at $mid, between $four and $seven", mid > four + 1f && mid < seven - 1f)
+        assertEquals(seven, end, 1f)
+    }
+
+    @Test
+    fun theSegmentHighlightJumpsUnderReducedMotion() {
+        val (start, mid, end, four, seven) = slide(reduced = true)
+        assertEquals(four, start, 1f)
+        assertEquals(seven, mid, 1f)
+        assertEquals(seven, end, 1f)
+    }
+
+    // look2 pinned preview (spec 4, 12.2): 184 dp at rest on a wide enough phone, 96 dp scrolled,
+    // compact from font scale 1.5, never over 30% of the window, and with the footer under 40%.
+    @Test
+    fun pinnedPreviewSizes() {
+        val w = 328.dp
+        assertEquals(184.dp, PinnedPreviewSize.height(w, 800.dp, 0.dp, 1f, 0f, mainPage = true, big = false))
+        assertEquals(96.dp, PinnedPreviewSize.height(w, 800.dp, 0.dp, 1f, 1f, mainPage = true, big = false))
+        assertEquals(96.dp, PinnedPreviewSize.height(w, 800.dp, 0.dp, 2f, 0f, mainPage = true, big = false))
+        assertEquals(150.dp, PinnedPreviewSize.height(w, 500.dp, 0.dp, 1f, 0f, mainPage = true, big = false))
+        assertEquals(120.dp, PinnedPreviewSize.height(w, 800.dp, 200.dp, 1f, 0f, mainPage = true, big = false))
+        assertEquals(96.dp, PinnedPreviewSize.height(w, 800.dp, 0.dp, 1f, 0f, mainPage = false, big = false))
+        assertEquals(184.dp, PinnedPreviewSize.height(w, 800.dp, 0.dp, 1f, 0f, mainPage = false, big = true))
+    }
+
+    // look2 notes: a message with no action shows no button, and each message says when it leaves
+    // (replaced by a newer one, or dismissed), once.
+    @Test
+    fun notesLeaveOnce() {
+        val state = UndoSnackbarState()
+        val gone = mutableListOf<String>()
+        compose.setContent { CytTheme { UndoSnackbarHost(state) } }
+        compose.runOnIdle { state.note("Copied.", null, null) { gone += "copied" } }
+        compose.onNodeWithText("Copied.").assertExists()
+        compose.onNodeWithText("Undo").assertDoesNotExist()
+        compose.runOnIdle { state.note("Options reset.", "Undo", {}) { gone += "reset" } }
+        compose.onNodeWithText("Undo").performClick()
+        compose.waitForIdle()
+        assertEquals(listOf("copied", "reset"), gone)
         assertNull(state.current)
     }
 }

@@ -166,13 +166,16 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 // Tertiary: a 48 dp text button in accent ("Customise", "I've set up a TV before"). Quiet: in
 // text.secondary ("Stop and undo": always present, never hidden, never red). guardObscured = true
 // when the tertiary writes to the TV ("Undo what we did" as the third button of a stop card).
+// `plain`: in text.primary instead of accent (the Look sheet's way back, as the prototype has it).
 @Composable
-fun TertiaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, quiet: Boolean = false, guardObscured: Boolean = false) =
+fun TertiaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, quiet: Boolean = false, guardObscured: Boolean = false,
+    plain: Boolean = false) =
     Guarded(modifier, guardObscured) { outer, guard ->
         val c = CytTheme.colors
         val color = when {
             !enabled -> c.textTertiary
             quiet -> c.textSecondary
+            plain -> c.textPrimary
             else -> c.accent
         }
         val source = remember { MutableInteractionSource() }
@@ -188,6 +191,21 @@ fun TertiaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modif
             Text(text, color = color, style = CytTheme.type.labelLarge, textAlign = TextAlign.Center)
         }
     }
+
+// look2: an outlined pill for a quiet action that only changes the phone's choice ("Use Classic's
+// own settings"): a 1 dp outline.strong stroke, text.primary, 48 dp tall and as wide as its words.
+@Composable
+fun OutlinedPill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = CytTheme.colors
+    val shape = CytTheme.shapes.pill
+    Box(
+        modifier.heightIn(min = 48.dp).clip(shape).border(1.dp, if (enabled) c.outlineStrong else c.outline, shape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(horizontal = 18.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = if (enabled) c.textPrimary else c.textSecondary, style = CytTheme.type.labelLarge, textAlign = TextAlign.Center)
+    }
+}
 
 // The one destructive action in the app, "Put everything back", inside its confirmation sheet only:
 // an outlined pill, 1.5 dp danger stroke, danger label, no fill. Never animated into place.

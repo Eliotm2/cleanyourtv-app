@@ -21,7 +21,8 @@ class SignerAndWifiTest {
     private val prober = AdbProber(ProbeFixtures.clock())
     private val bundled = File(Fixtures.repoRoot, "android/platform/src/main/assets/bundled")
     // SHA-256 of the launcher key K1's certificate, as PinnedLauncher.SIGNER_SHA256 holds it.
-    private val k1 = Sha256("576418154bec6505bfc709ccaa6ae85b6e09d98eb89f4a25147ca1b4b0505132")
+    // Fork (Thomas): the bundled launcher and curtain are signed with the fork's key.
+    private val k1 = Sha256("fa73a3a033c6bb075706307ff446928530b90305a198b4349b02c4ce1eae29d5")
 
     @Test fun signerOfTheBundledApks() {
         assertEquals(k1, ApkSigners.signerSha256(File(bundled, "cleanyourtv-launcher.apk").readBytes()))
@@ -42,10 +43,13 @@ class SignerAndWifiTest {
         // The certificate appears once per scheme; another certificate in either one means v2 and v3
         // disagree (an APK signed v2 with another key, K1 planted in v3), so the signer is unknown.
         val at = occurrences(apk, cert)
-        assertEquals(2, at.size)
+        // Fork (Thomas): the fork's launcher is signed v2 only (minSdk 26), so its certificate appears once.
+        assertEquals(1, at.size)
         for (i in at) {
             val other = apk.copyOf().also { it[i + cert.size / 2] = (it[i + cert.size / 2].toInt() xor 0x55).toByte() }
-            assertNull(ApkSigners.signerSha256(other), "certificate at $i changed")
+            // Fork (Thomas): with v2 alone there is no second copy to disagree with, so a changed certificate
+            // reads as another key; what matters is that it is never K1.
+            assertTrue(ApkSigners.signerSha256(other) != k1, "certificate at $i changed")
         }
     }
 

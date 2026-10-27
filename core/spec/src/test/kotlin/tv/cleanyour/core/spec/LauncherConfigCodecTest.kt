@@ -68,7 +68,7 @@ class LauncherConfigCodecTest {
 
     // settings_key_keycodes is all or nothing, as Config.intArray reads it.
     @Test fun keycodesAreAllOrNothing() {
-        assertEquals(listOf(83, 83, Int.MAX_VALUE), ok("{\"settings_key_keycodes\": [83.9, 4294967379, 1e400]}").doc.settingsKeyKeycodes)
+        assertEquals(listOf(83, 83, Int.MAX_VALUE), ok("{\"settings_key_keycodes\": [83.9, 4294967379, 1e300]}").doc.settingsKeyKeycodes)
         assertEquals(emptyList(), ok("{\"settings_key_keycodes\": []}").doc.settingsKeyKeycodes)
         for (bad in listOf("[83, 0]", "[83, \"84\"]", "[83, null]", "[83,,84]", "[0.5]", "83", "\"83\"")) {
             val r = ok("{\"settings_key_keycodes\": $bad}")
@@ -167,6 +167,49 @@ class LauncherConfigCodecTest {
         assertEquals("x", ok("{'live_tv_action' => ' x ' /* c */ # hash\n}").doc.liveTvAction)
     }
 
+    // The keys launcher 2.7 reads that LauncherConfigDoc has no field for (the 0.4.0 looks' three
+    // and look2's) are carried as is with no warning (the bundled launcher does read them), and
+    // written back after the modelled keys, sorted. Each is in the submodule's config.xml (but
+    // dock_opacity, which Config.load reads from config.json alone) and in its Config.load.
+    @Test fun launcher27KeysTheLooksUseAreCarriedWithoutAWarning() {
+        val r = ok("{\"ambient_glow\": false, \"cinematic_scrim\": 45, \"cinematic_art\": 20, \"columns\": 5, \"zz\": 1}")
+        assertEquals(setOf("ambient_glow", "cinematic_scrim", "cinematic_art", "zz"), r.doc.unknown.keys)
+        assertEquals(listOf("unknown key zz; the launcher ignores it (carried as is)"), r.warnings)
+        assertEquals("{\n  \"columns\": 5,\n  \"ambient_glow\": false,\n  \"cinematic_art\": 20,\n  \"cinematic_scrim\": 45,\n  \"zz\": 1\n}\n",
+            LauncherConfigCodec.encode(r.doc).decodeToString())
+        val xml = java.io.File(Fixtures.upstreamDir, "launcher/app/src/main/res/values/config.xml").readText()
+        // dock_opacity is read from config.json alone (Config.load: 30 to 100, else 100).
+        for (k in ConfigCodecImpl.CARRIED_27 - "dock_opacity") assertTrue(Regex("<(bool|integer|string) name=\"$k\"").containsMatchIn(xml), k)
+        val reader = java.io.File(Fixtures.upstreamDir, "launcher/app/src/main/java/com/gathin/tvhome/Config.java").readText()
+        for (k in ConfigCodecImpl.CARRIED_27) assertTrue("(json, \"$k\"" in reader, "Config.load reads $k from config.json")
+    }
+
+    // Every carried key round trips with no warning, in every value LookKeys writes.
+    @Test fun everyCarriedKeyRoundTripsWithoutAWarning() {
+        assertEquals(16, ConfigCodecImpl.CARRIED_27.size)
+        for (k in ConfigCodecImpl.CARRIED_27) assertTrue(k !in ConfigCodecImpl.MODELLED, k)
+        val values = mapOf(
+            "glow_style" to listOf(JsonPrimitive("radial"), JsonPrimitive("horizon")),
+            "dock_opacity" to listOf(30, 50, 70, 100).map { JsonPrimitive(it) },
+            "cinematic_scrim" to listOf(0, 45, 100).map { JsonPrimitive(it) },
+            "cinematic_art" to listOf(0, 20, 50, 100).map { JsonPrimitive(it) },
+        )
+        for (k in ConfigCodecImpl.CARRIED_27) for (v in values[k] ?: listOf(JsonPrimitive(true), JsonPrimitive(false))) {
+            val doc = LauncherConfigDoc(columns = 5, unknown = mapOf(k to v))
+            val text = LauncherConfigCodec.encode(doc).decodeToString()
+            assertEquals("{\n  \"columns\": 5,\n  \"$k\": $v\n}\n", text)
+            val back = ok(text)
+            assertEquals(emptyList(), back.warnings, "$k $v")
+            assertEquals(doc, back.doc, "$k $v")
+        }
+        // All of them at once, as a look2 push writes them: sorted after the modelled keys.
+        val all = LauncherConfigDoc(dockRow = true, unknown = ConfigCodecImpl.CARRIED_27.associateWith { k -> values[k]?.first() ?: JsonPrimitive(false) })
+        val text = LauncherConfigCodec.encode(all).decodeToString()
+        assertEquals(listOf("dock_row") + ConfigCodecImpl.CARRIED_27.sorted(), Regex("\"([a-z_0-9]+)\":").findAll(text).map { it.groupValues[1] }.toList())
+        assertEquals(emptyList(), ok(text).warnings)
+        assertEquals(all, ok(text).doc)
+    }
+
     // RFC-W4-1: the two keys upstream 1bbf0c9 added are fields, decoded in Config.java's order and
     // never carried in `unknown`.
     @Test fun inputActionAndModuleCardsAreModelled() {
@@ -188,6 +231,16 @@ class LauncherConfigCodecTest {
         val d = LauncherConfigCodec.effective(wrong.doc, LauncherConfigCodec.builtInDefaults)
         assertEquals("" to true, d.inputAction to d.moduleCards)
         assertEquals("" to true, LauncherConfigCodec.builtInDefaults.let { it.inputAction to it.moduleCards })
+    }
+
+    // Launcher 2.7 keeps a copy of config.json through JSONObject.toString(), which is null for a
+    // NaN or Infinity in a list: Home would crash on every start, so the file is refused.
+    @Test fun aNanOrInfinityInAListCrashesLauncher27() {
+        for (json in listOf("{\"dock_apps\": [NaN, \"a.b\"]}", "{\"settings_key_keycodes\": [83, 1e400]}", "{\"x\": {\"y\": [-1e400]}}",
+            "{\"race_calendar\": [{\"sessions\": [], \"n\": [NaN]}]}"))
+            assertEquals(ConfigCodecImpl.CRASH_27_NON_FINITE, rejected(json.encodeToByteArray()).reason, json)
+        assertTrue("crash" in ConfigCodecImpl.CRASH_27_NON_FINITE)
+        assertEquals(listOf(4), ok("{\"settings_key_keycodes\": [4.9]}").doc.settingsKeyKeycodes)
     }
 
     @Test fun refusesWhatTheLauncherIgnoresOrCrashesOn() {
@@ -227,10 +280,10 @@ class LauncherConfigCodecTest {
 
     @Test fun bundledThemes() {
         val themes = BundledThemeSource().bundled()
-        // dussehra (v2.4.0) is not bundled: its festival ends on 2026-10-21.
-        assertEquals(listOf("default", "aurora", "six-columns"), themes.map { it.id })
+        // dussehra (v2.4.0) is not bundled: its festival ends on 2026-10-21. The app's own looks follow.
+        assertEquals(listOf("default", "aurora", "six-columns", "cinema", "console", "horizon", "quiet", "diwali", "library", "arcade", "mist"), themes.map { it.id })
         assertEquals(false, themes[0].doc.reducedMotion, "the bundled default is v2.4.0's")
-        assertEquals(listOf("Default", "Aurora", "Six columns"), themes.map { it.name })
+        assertEquals(listOf("Default", "Aurora", "Six columns", "Cinema", "Console", "Horizon", "Quiet black", "Diwali", "Library", "Arcade", "Mist"), themes.map { it.name })
         val aurora = themes[1]
         val wp = aurora.wallpaper!!
         val bytes = BundledThemeSource.bytes(wp)!!
@@ -242,5 +295,47 @@ class LauncherConfigCodecTest {
             // A bundled theme survives our own encoder unchanged.
             assertEquals(t.doc, assertIs<DecodeResult.Ok>(LauncherConfigCodec.decode(LauncherConfigCodec.encode(t.doc))).doc)
         }
+    }
+
+    // 0.4.0: every look of the app's own sets each layout and motion key outright, so switching from
+    // any look to it leaves nothing of the last one behind; it decodes without a warning, and its
+    // picture is a JPEG under the transport's 300 KB cap that the launcher shows (wallpaper true).
+    @Test fun ownLooksSetEveryLayoutAndMotionKey() {
+        val own = BundledThemeSource().bundled().drop(3)
+        assertEquals(listOf("cinema", "console", "horizon", "quiet", "diwali", "library", "arcade", "mist"), own.map { it.id })
+        for (t in own) {
+            val d = t.doc
+            val keys = listOf(d.backgroundColor, d.wallpaper, d.wallpaperDim, d.wallpaperRotationMinutes, d.skyIntensity, d.cinematicHome,
+                d.dockTitle, d.dockRow, d.columns, d.rowsBelowDock, d.animations, d.advancedEffects, d.reducedMotion)
+            assertTrue(keys.all { it != null }, "${t.id} leaves a key to the launcher")
+            assertEquals(null, d.dockApps, "${t.id} names no apps")
+            val bytes = LauncherConfigCodec.encode(d)
+            assertEquals(emptyList(), assertIs<DecodeResult.Ok>(LauncherConfigCodec.decode(bytes)).warnings, t.id)
+            val w = t.wallpaper
+            assertEquals(d.wallpaper == true, w != null, "${t.id}: a picture exactly when the look shows one")
+            if (w != null) {
+                val b = BundledThemeSource.bytes(w)!!
+                assertTrue(b.size in 1..300_000, "${t.id}: ${b.size} bytes")
+                assertTrue(b[0] == 0xFF.toByte() && b[1] == 0xD8.toByte(), "${t.id}: a JPEG")
+            }
+        }
+        assertEquals(55, own.first { it.id == "horizon" }.doc.skyIntensity)
+        assertEquals(false, own.first { it.id == "library" }.doc.dockRow, "Library: one plain grid from the top")
+        val diwali = own.first { it.id == "diwali" }.doc
+        assertEquals("diwali", diwali.festival); assertEquals("2026-11-10", diwali.festivalUntil)
+        // rows_below_dock is the phone's to write: DockLayers sets it from the dock's length on every
+        // push (as every version since 0.1.0 does), so a look file saying 1 promised a row a 4-app dock never shows.
+        for (t in own) assertEquals(0, t.doc.rowsBelowDock, "${t.id}: the rows under the dock follow the dock")
+    }
+
+    @Test fun datedLooksAreOfferedUpToTheirLastDay() {
+        val last = java.time.LocalDate.of(2026, 11, 10)
+        assertEquals(last, Looks.info("diwali")?.until)
+        assertEquals(BundledThemeSource().bundled().first { it.id == "diwali" }.doc.festivalUntil, last.toString(), "the side table and the festival end together")
+        assertTrue(Looks.offered("diwali", last))
+        assertTrue(!Looks.offered("diwali", last.plusDays(1)))
+        assertTrue(Looks.offered("cinema", last.plusYears(5)))
+        assertTrue(Looks.offered(null, last.plusYears(5)))
+        assertTrue(Looks.info("horizon")!!.sky)
     }
 }

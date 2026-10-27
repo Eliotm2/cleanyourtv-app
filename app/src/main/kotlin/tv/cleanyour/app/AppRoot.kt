@@ -21,8 +21,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -179,6 +181,15 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
 
     val undoLabel = androidx.compose.ui.res.stringResource(tv.cleanyour.feature.manage.R.string.action_undo)
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    // 0.4.0 "Your photo" on the Look sheet: the system photo picker, images only, no permission.
+    var onPhoto by remember { mutableStateOf<((android.net.Uri) -> Unit)?>(null) }
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) onPhoto?.invoke(uri); onPhoto = null }
+    val photoPicker = remember(pickPhoto) {
+        tv.cleanyour.ui.design.component.PhotoPicker { cb ->
+            onPhoto = cb
+            pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+    }
 
     suspend fun onSetupEffect(e: SetupEffect) = when (e) {
         SetupEffect.HapticLight -> haptic(HapticFeedbackConstants.CLOCK_TICK)
@@ -229,7 +240,7 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
                     BackHandler { if (!m.back()) { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) else onExit() } }
                     SecureWindow((state as? SetupState.OpenDoor)?.phase == DoorPhase.ALLOW)
                     if (isConnectState(state)) ConnectFlow(state, extras, m, onReturning = { go("returning") }, onCopyError = { copyText(context, it, "error") })
-                    else SetupFlow(state, extras, m, onCopyCommands = { copyText(context, it) }, onRoute = { go(it) })
+                    else SetupFlow(state, extras, m, onCopyCommands = { copyText(context, it) }, onRoute = { go(it) }, photos = photoPicker)
                 }
                 entry<Dest.Manage> { key ->
                     val m = rememberMachine("manage:${key.tvId}") { graph.manage(it, key.tvId?.let(::TvId)) }
@@ -256,7 +267,7 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
                     val m = rememberMachine("home:${key.tvId}") { graph.homeScreen(it, TvId(key.tvId)) }
                     val state by m.state.collectAsStateWithLifecycle()
                     LaunchedEffect(m) { m.effects.collect { onManageEffect(it) } }
-                    HomeScreen(state, m::dispatch, onBack = { go("back") })
+                    HomeScreen(state, m::dispatch, onBack = { go("back") }, photos = photoPicker)
                 }
                 entry<Dest.Modules> { key ->
                     val m = rememberMachine("modules:${key.tvId}") { graph.modules(it, TvId(key.tvId)) }

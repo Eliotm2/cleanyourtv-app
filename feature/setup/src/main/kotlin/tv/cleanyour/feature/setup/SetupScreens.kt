@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -104,16 +105,21 @@ import tv.cleanyour.ui.design.component.SummaryGroup
 import tv.cleanyour.ui.design.component.SwitchRow
 import tv.cleanyour.ui.design.component.TertiaryButton
 import tv.cleanyour.ui.design.component.TextActionRow
-import tv.cleanyour.ui.design.component.ThemeOption
-import tv.cleanyour.ui.design.component.ThemePicker
 import tv.cleanyour.ui.design.component.TitleSize
 import tv.cleanyour.ui.design.component.TvStatusChip
 import tv.cleanyour.ui.design.component.TvThumbnail
-import tv.cleanyour.ui.design.component.themeSwatch
 import tv.cleanyour.ui.design.component.UndoSnackbarHost
 import tv.cleanyour.ui.design.component.UndoSnackbarState
 import tv.cleanyour.ui.design.component.rememberEmphasis
 import tv.cleanyour.ui.design.component.rememberUndoSnackbarState
+import tv.cleanyour.ui.design.component.LookDoneFooter
+import tv.cleanyour.ui.design.component.LookEditor
+import tv.cleanyour.ui.design.component.LookEditorNav
+import tv.cleanyour.ui.design.component.LookEditorSheet
+import tv.cleanyour.ui.design.component.rememberLookEditorNav
+import tv.cleanyour.ui.design.component.LookEditorState
+import tv.cleanyour.ui.design.component.PhotoPicker
+import tv.cleanyour.ui.design.component.toEditor
 import tv.cleanyour.ui.design.theme.CytTheme
 import tv.cleanyour.ui.design.theme.Glow
 import tv.cleanyour.core.engine.NarrationState as EngineNarration
@@ -132,10 +138,12 @@ fun SetupFlow(
     // 0.3.2 B1, B2: the report preview is the app's own screen; these open it ("report/tv/<id>",
     // "report/problem/<id>").
     onRoute: (String) -> Unit = {},
+    // 0.4.0: the system photo picker, for "Choose a photo" in the look step.
+    photos: PhotoPicker? = null,
 ) {
     when (state) {
         is SetupState.Probing -> ProbingScreen(state, extras, modifier, actions)
-        is SetupState.Found -> FoundScreen(state, extras, actions, modifier, onCopyCommands, onHelpAddTv = { onRoute("report/tv/${state.tvId.value}") })
+        is SetupState.Found -> FoundScreen(state, extras, actions, modifier, onCopyCommands, onHelpAddTv = { onRoute("report/tv/${state.tvId.value}") }, photos = photos)
         is SetupState.Working -> WorkingScreen(state, extras, actions, modifier)
         is SetupState.Check -> CheckScreen(state, extras, actions, modifier, nowMs)
         is SetupState.Stopped -> StoppedScreen(state, extras, actions, modifier, onReport = { onRoute("report/problem/${state.tvId.value}") })
@@ -193,6 +201,7 @@ internal fun CandidateCard(issue: String?, actions: SetupActions) {
 fun FoundScreen(
     state: SetupState.Found, extras: SetupExtras, actions: SetupActions, modifier: Modifier = Modifier, onCopyCommands: (String) -> Unit = {},
     onHelpAddTv: () -> Unit = {},
+    photos: PhotoPicker? = null,
 ) {
     val summary = state.plan.summary
     // Every switch-off of the plan, the home screen switch's own included (round 3).
@@ -279,7 +288,7 @@ fun FoundScreen(
         Sheet.LIST, Sheet.CUSTOMISE -> CustomiseSheet(state, extras, actions, onCopyCommands)
         Sheet.DOCK -> DockSheet(extras.dock, extras.apps, extras.dockColumns, onDone = { actions.intent(SetupIntent.SetDock(it)); actions.intent(SetupIntent.Open(null)) },
             onDismiss = { actions.intent(SetupIntent.Open(null)) })
-        Sheet.THEME -> CytBottomSheet({ actions.intent(SetupIntent.Open(null)) }) { ThemeContent(extras, actions) }
+        Sheet.THEME -> ThemeSheet(extras, actions, photos)
         else -> {}
     }
 }
@@ -364,8 +373,11 @@ internal fun ColumnScope.CustomiseContent(
         }
         ListRow(dockRow, onClick = { actions.intent(SetupIntent.Open(Sheet.DOCK)) })
         ListDivider()
+        // The look, and its apps in a row when it is not the look's own ("Look: Console, 6 apps in a row").
         val theme = extras.themes.firstOrNull { it.id == extras.draft?.themeId }?.name ?: stringResource(R.string.theme_default)
-        ListRow(msg(R.string.customise_look_row, "theme" to theme), onClick = { actions.intent(SetupIntent.Open(Sheet.THEME)) })
+        val count = extras.look?.takeIf { it.columns != it.lookColumns }?.columns
+        ListRow(if (count != null) msg(R.string.customise_look_row_count, "theme" to theme, "count" to count) else msg(R.string.customise_look_row, "theme" to theme),
+            onClick = { actions.intent(SetupIntent.Open(Sheet.THEME)) })
     }
     if (custom) {
         // RFC-CURTAIN-1: Custom only, on by default; Simple always shows the progress on the TV.
@@ -446,23 +458,43 @@ internal fun DockContent(state: DockEditorState, apps: List<AppChoice>, onDone: 
 
 internal fun AppChoice.toDockApp() = DockApp(pkg.value, name)
 
-// The look picker (S3a "Look: Default >"): Default, Aurora, Six columns.
+// The look step (S3a "Look: Default >"): the Look editor of :ui:design, the same pages in the same
+// order as the Look sheet after Setup (Picture, Style, Apps in a row, Names under every app, More
+// options and Advanced), with Done as its footer. A tap only changes the draft (SetupIntent.Look,
+// the same edits as the Look sheet), so nothing here is guarded; the push happens when Setup runs.
+// Closing keeps the choice, so there is no leave question. `pictures`: the pictures by file, given
+// by the screenshot tests (the app reads the files).
 @Composable
-internal fun ThemeContent(extras: SetupExtras, actions: SetupActions) {
-    SheetHeader(stringResource(R.string.theme_title))
-    // The same picker as M2 (ThemePicker with the preview tiles), so the look reads the same in
-    // the wizard and on Manage (R4-W8). A tap here only changes the draft, so it is not guarded.
-    val options = listOf(ThemeOption("default", stringResource(R.string.theme_default), stringResource(R.string.theme_default_desc), themeSwatch("default"))) +
-        extras.themes.filter { it.id != "default" }.map { ThemeOption(it.id, it.name, themeDescription(it.id) ?: it.description, themeSwatch(it.id)) }
-    ThemePicker(options, extras.draft?.themeId ?: "default", { actions.intent(SetupIntent.SetTheme(it.id)) }, Modifier.padding(top = 16.dp))
+internal fun ThemeSheet(extras: SetupExtras, actions: SetupActions, photos: PhotoPicker? = null) {
+    val editor = extras.toEditor() ?: return
+    LookEditorSheet(
+        editor, onEdit = { actions.intent(SetupIntent.Look(it)) },
+        onPhoto = { jpeg, dim -> actions.intent(SetupIntent.SetOwnPicture(jpeg, dim)) },
+        onClose = { actions.intent(SetupIntent.Open(null)) },
+        footer = { LookDoneFooter { actions.intent(SetupIntent.Open(null)) } },
+        photos = photos, asksBeforeLeaving = false, photoAfter = stringResource(R.string.look_photo_after),
+    )
 }
 
+// The same editor without the modal window, for the screenshot tests (a bounded height, as the
+// sheet gives it).
 @Composable
-private fun themeDescription(id: String): String? = when (id) {
-    "aurora" -> stringResource(R.string.theme_aurora_desc)
-    "six-columns" -> stringResource(R.string.theme_six_columns_desc)
-    else -> null
+internal fun ColumnScope.ThemeContent(extras: SetupExtras, actions: SetupActions, photos: PhotoPicker? = null, pictures: Map<String, ImageBitmap>? = null,
+    modifier: Modifier = Modifier, nav: LookEditorNav = rememberLookEditorNav()) {
+    val editor = extras.toEditor() ?: return
+    LookEditor(
+        editor, onEdit = { actions.intent(SetupIntent.Look(it)) },
+        onPhoto = { jpeg, dim -> actions.intent(SetupIntent.SetOwnPicture(jpeg, dim)) },
+        onClose = { actions.intent(SetupIntent.Open(null)) },
+        footer = { LookDoneFooter { actions.intent(SetupIntent.Open(null)) } },
+        photos = photos, pictures = pictures, modifier = modifier, nav = nav, asksBeforeLeaving = false,
+        photoAfter = stringResource(R.string.look_photo_after),
+    )
 }
+
+// The look step's draft as the editor shows it: the one mapping, LookEditorFrom. Setup has no
+// earlier look yet.
+internal fun SetupExtras.toEditor(): LookEditorState? = look?.toEditor(pictures, ownPicture, ownDim, newPicture, newDim, earlierPicture = null)
 
 // S4a Making it clean: narration, live thumbnail, the quiet "Stop and undo" (UX 4a, D18, D32).
 @Composable

@@ -47,33 +47,47 @@ import tv.cleanyour.ui.design.component.Lead
 import tv.cleanyour.ui.design.component.ListDivider
 import tv.cleanyour.ui.design.component.ListGroup
 import tv.cleanyour.ui.design.component.ListRow
+import tv.cleanyour.ui.design.component.PhotoPicker
 import tv.cleanyour.ui.design.component.PrimaryButton
 import tv.cleanyour.ui.design.component.ProgressBar
 import tv.cleanyour.ui.design.component.ScreenScaffold
 import tv.cleanyour.ui.design.component.ScreenTitle
 import tv.cleanyour.ui.design.component.SheetHeader
 import tv.cleanyour.ui.design.component.TertiaryButton
-import tv.cleanyour.ui.design.component.ThemeOption
-import tv.cleanyour.ui.design.component.ThemePicker
-import tv.cleanyour.ui.design.component.themeSwatch
 import tv.cleanyour.ui.design.icon.CytIcons
 import tv.cleanyour.ui.design.theme.Glow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import tv.cleanyour.ui.design.component.LookEditorState
+import tv.cleanyour.ui.design.component.TvPreview
+import tv.cleanyour.ui.design.component.galleryPictureName
+import tv.cleanyour.ui.design.component.lookPicture
+import tv.cleanyour.ui.design.component.styleName
+import tv.cleanyour.ui.design.component.toTvLook
 
 // M2 Home screen: Dock (S3b), Look (theme picker), "Use the TV's own home screen" with its preview,
-// and the drift banner with "Restore mine" (D15). Each sheet keeps its body in an internal *Content
+// and the drift banner with "Send mine again" (D15). Each sheet keeps its body in an internal *Content
 // composable, so the screenshot tests can draw it on SheetSurface.
 @Composable
-fun HomeScreen(state: HomeScreenState, onIntent: (HomeScreenIntent) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeScreen(state: HomeScreenState, onIntent: (HomeScreenIntent) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier, photos: PhotoPicker? = null) {
     val notOnTv = state.notOnTv
     if (notOnTv != null) { NotOnTvScreen(state.tvName, notOnTv, onIntent, onBack, modifier); return }
     var dockOpen by rememberSaveable { mutableStateOf(false) }
-    var lookOpen by rememberSaveable { mutableStateOf(false) }
     val busy = state.busy
     ScreenScaffold(Glow.Tv, modifier, topBar = { CytTopBar(onBack = onBack) }) {
         ScreenTitle(stringResource(R.string.home_title), Modifier.padding(top = 20.dp))
         if (state.drift) {
             Banner(stringResource(R.string.home_drift_banner), BannerTone.WARNING, Modifier.padding(top = 16.dp),
                 actionLabel = stringResource(R.string.home_drift_restore), onAction = { onIntent(HomeScreenIntent.RestoreMine) }, guardAction = true)
+        }
+        // 0.4.0: a dated look (Diwali) ended; the phone already counts the look before it as this
+        // TV's, and one tap puts it back on the TV (the launcher only drops the festival skin).
+        state.endedLook?.let { ended ->
+            if (!state.drift) {
+                Banner(msg(R.string.home_look_ended_banner, "picture" to ended), BannerTone.INFO, Modifier.padding(top = 16.dp),
+                    actionLabel = stringResource(R.string.home_look_ended_restore), onAction = { onIntent(HomeScreenIntent.RestoreMine) }, guardAction = true)
+            }
         }
         if (busy != null) {
             LiveLine(stringResource(R.string.home_applying))
@@ -87,8 +101,12 @@ fun HomeScreen(state: HomeScreenState, onIntent: (HomeScreenIntent) -> Unit, onB
             ListRow(stringResource(R.string.home_row_dock), subtitle = dockLine.ifEmpty { null },
                 onClick = if (busy == null) ({ dockOpen = true }) else null)
             ListDivider()
-            val theme = state.themes.firstOrNull { it.id == state.themeId }?.name ?: stringResource(R.string.theme_default)
-            ListRow(stringResource(R.string.home_row_look), subtitle = theme, onClick = if (busy == null) ({ lookOpen = true }) else null)
+            LookRow(state, onClick = if (busy == null) ({ onIntent(HomeScreenIntent.OpenLook) }) else null)
+        }
+        // look2: a failed look send keeps the draft (and a new photo); Open Look reopens it.
+        if (state.lookFailed && busy == null) {
+            Banner(stringResource(R.string.home_look_failed), BannerTone.WARNING, Modifier.padding(top = 12.dp),
+                actionLabel = stringResource(R.string.home_look_failed_open), onAction = { onIntent(HomeScreenIntent.OpenLook) })
         }
         // Launcher 2.4: Launcher settings on the TV can override what the phone sent; the phone
         // cannot read them, so the rows above show what config.json says. Launcher 2.5 also edits the
@@ -116,10 +134,12 @@ fun HomeScreen(state: HomeScreenState, onIntent: (HomeScreenIntent) -> Unit, onB
             }
         }
     }
-    if (dockOpen) DockSheet(state.dock, state.apps, state.columns, onDone = { onIntent(HomeScreenIntent.SetDock(it)); dockOpen = false }, onDismiss = { dockOpen = false })
-    if (lookOpen) CytBottomSheet({ lookOpen = false }) {
-        LookContent(state) { onIntent(HomeScreenIntent.SetTheme(it)); lookOpen = false }
+    if (dockOpen) {
+        DockSheet(state.dock, state.apps, state.columns, onDone = { onIntent(HomeScreenIntent.SetDock(it)); dockOpen = false }, onDismiss = { dockOpen = false },
+            waiting = state.waiting)
     }
+    // The Look sheet, while a draft is open and not sending (the sheet closes on "Put it on the TV").
+    if (state.look != null && busy == null && !state.lookFailed) LookSheet(state, onIntent, photos)
     state.stockPreview?.let { plan ->
         CytBottomSheet({ onIntent(HomeScreenIntent.CancelPreview) }) { StockPreviewContent(plan, onIntent) }
     }
@@ -173,24 +193,6 @@ private fun NotOnTvScreen(tvName: String, n: NotOnTv, onIntent: (HomeScreenInten
     }
 }
 
-// The three launcher themes with their one-line descriptions; the preview tile colours come from
-// :ui:design (themeSwatch), shared with the wizard's picker.
-private val themeDescriptions = mapOf(
-    "default" to R.string.theme_default_desc,
-    "aurora" to R.string.theme_aurora_desc,
-    "six-columns" to R.string.theme_six_columns_desc,
-)
-
-// A tap here applies the look to the TV, so the rows are guarded like a primary (R4-W8).
-@Composable
-internal fun ColumnScope.LookContent(state: HomeScreenState, onSelect: (String) -> Unit) {
-    SheetHeader(stringResource(R.string.theme_title))
-    val options = state.themes.map { t ->
-        ThemeOption(t.id, t.name, themeDescriptions[t.id]?.let { stringResource(it) } ?: t.description, themeSwatch(t.id))
-    }
-    ThemePicker(options, state.themeId ?: "default", { onSelect(it.id) }, Modifier.padding(top = 16.dp), guardObscured = true)
-}
-
 @Composable
 internal fun ColumnScope.StockPreviewContent(plan: Plan, onIntent: (HomeScreenIntent) -> Unit) {
     SheetHeader(stringResource(R.string.home_stock_preview_title))
@@ -221,8 +223,10 @@ internal fun ColumnScope.UpdatePreviewContent(plan: Plan, version: String, onInt
 
 // S3b on Manage: the dock and the rows under it (DockEditor), held and dragged to order, with up
 // and down buttons for the UX 7.1 motor rule. Done applies the one ordered list to the TV.
+// 0.4.0 `waiting`: saved apps beyond the three rows at this many apps in a row. The sheet does not
+// show them and Done keeps them after its own list (HomeScreenMachine), so one line says where they are.
 @Composable
-fun DockSheet(current: List<AppChoice>, apps: List<AppChoice>, columns: Int, onDone: (List<PackageName>) -> Unit, onDismiss: () -> Unit) {
+fun DockSheet(current: List<AppChoice>, apps: List<AppChoice>, columns: Int, onDone: (List<PackageName>) -> Unit, onDismiss: () -> Unit, waiting: Int = 0) {
     val state = remember(current, columns) { DockEditorState(current.map { it.toDockApp() }, columns) }
     val scroll = rememberScrollState()
     val undo = rememberUndoSnackbarState()
@@ -230,17 +234,49 @@ fun DockSheet(current: List<AppChoice>, apps: List<AppChoice>, columns: Int, onD
         // Three rows and the other apps can be taller than the screen; the sheet scrolls, also by
         // itself while an app is dragged near its edge.
         Box(Modifier.fillMaxWidth()) {
-            Column(Modifier.verticalScroll(scroll)) { DockContent(state, apps, { onDone(state.apps.map { PackageName(it.key) }) }, scroll, undo) }
+            Column(Modifier.verticalScroll(scroll)) { DockContent(state, apps, { onDone(state.apps.map { PackageName(it.key) }) }, scroll, undo, waiting) }
             UndoSnackbarHost(undo, Modifier.align(Alignment.BottomCenter))
         }
     }
 }
 
 @Composable
-internal fun ColumnScope.DockContent(state: DockEditorState, apps: List<AppChoice>, onDone: () -> Unit, scroll: ScrollState? = null, undo: UndoSnackbarState? = null) {
+internal fun ColumnScope.DockContent(state: DockEditorState, apps: List<AppChoice>, onDone: () -> Unit, scroll: ScrollState? = null, undo: UndoSnackbarState? = null,
+    waiting: Int = 0) {
     SheetHeader(stringResource(R.string.dock_title), subtitle = msg(R.string.dock_body, "count" to state.columns))
-    DockEditor(state, remember(apps) { apps.map { it.toDockApp() } }, scroll = scroll, undo = undo)
+    DockEditor(state, remember(apps) { apps.map { it.toDockApp() } }, scroll = scroll, undo = undo,
+        footnote = if (waiting > 0) msg(R.string.dock_waiting, "count" to waiting) else null)
     PrimaryButton(stringResource(R.string.action_done), onDone, Modifier.padding(top = 20.dp))
 }
 
 internal fun AppChoice.toDockApp() = DockApp(pkg.value, name)
+
+// The Look row (W1): a 64 x 36 dp picture of what was last sent, then "Glass with Mist" and
+// "5 apps in a row". A look saved before look2 that was never sent again keeps its 0.4.0 name.
+@Composable
+internal fun LookRow(state: HomeScreenState, onClick: (() -> Unit)?) {
+    val sent = state.sent
+    val style = state.sentStyle
+    // W1: while a look send runs (the sheet closes on Put it on the TV), the row says so.
+    val subtitle = if (state.lookSending && state.busy != null) {
+        stringResource(R.string.home_row_look_sending)
+    } else if (style == null) {
+        state.themes.firstOrNull { it.id == state.themeId }?.name ?: stringResource(R.string.theme_default)
+    } else {
+        val name = styleName(style)
+        val pic = state.sentPicture
+        val first = when {
+            pic == null || pic == LookEditorState.NONE -> msg(R.string.home_row_look_summary_none, "style" to name)
+            pic == LookEditorState.MINE || pic == LookEditorState.NEW || pic == LookEditorState.EARLIER -> msg(R.string.home_row_look_summary_photo, "style" to name)
+            else -> state.pictures.firstOrNull { it.id == pic }?.let { msg(R.string.home_row_look_summary_picture, "style" to name, "picture" to galleryPictureName(it.id, it.name)) }
+                ?: msg(R.string.home_row_look_summary_none, "style" to name)
+        }
+        first + "\n" + msg(R.string.home_row_look_columns, "count" to (sent?.columns ?: state.columns))
+    }
+    ListRow(
+        stringResource(R.string.home_row_look), subtitle = subtitle, onClick = onClick,
+        leading = sent?.let { p ->
+            { Box(Modifier.size(64.dp, 36.dp).clearAndSetSemantics {}) { TvPreview(p.toTvLook(lookPicture(p.picturePath, sample = 16)), "", Modifier.width(64.dp)) } }
+        },
+    )
+}

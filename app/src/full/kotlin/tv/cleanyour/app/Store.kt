@@ -17,18 +17,30 @@ object Store : StorePorts {
 
     // D12: one GET on user action (Settings, "Check for updates"); "couldn't check" when GitHub
     // does not answer or the repository has no published release yet.
-    // Fork (Thomas): no release feed of its own, and an upstream release could not install over this
-    // key anyway, so "Check for updates" answers "couldn't check" (null) instead of offering one.
-    override fun updateChecker(http: HttpFetcher) = UpdateChecker { null }
-
-    @Suppress("unused")
-    fun upstreamUpdateChecker(http: HttpFetcher) = UpdateChecker { current ->
+    // Fork (Thomas): the feed is the fork's own releases (Eliotm2/cleanyourtv-app, built and signed
+    // every night by .github/workflows/thomas-sync.yml with the fork's key), so what it offers
+    // installs over this app. Upstream releases are signed with another key and are never offered.
+    override fun updateChecker(http: HttpFetcher) = UpdateChecker { current ->
         val r = http.get(RELEASES_URL, null, null)
         if (r.code != 200) { r.body?.close(); null } else {
             val body = r.body?.use { it.readBytes().decodeToString() } ?: return@UpdateChecker null
-            val tag = Regex("\"tag_name\"\\s*:\\s*\"v?([0-9][0-9A-Za-z.]*)\"").find(body)?.groupValues?.get(1) ?: return@UpdateChecker null
-            if (offered(tag, current)) tag else ""
+            val tag = Regex("\"tag_name\"\\s*:\\s*\"v?([0-9][0-9A-Za-z.\\-]*)\"").find(body)?.groupValues?.get(1) ?: return@UpdateChecker null
+            if (forkNewer(tag, current)) tag else ""
         }
+    }
+
+    // Fork (Thomas): "0.4.1-thomas.1" > "0.4.0-thomas.7" > "0.4.0-thomas.6": the upstream version
+    // first, then the fork's own number. A version without "-thomas.N" counts as thomas.0.
+    internal fun forkNewer(tag: String, current: String): Boolean {
+        fun parts(v: String): List<Int> {
+            val up = v.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+            val n = Regex("-thomas\\.(\\d+)").find(v)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            return List(3) { up.getOrElse(it) { 0 } } + n
+        }
+        val a = parts(tag)
+        val b = parts(current)
+        for (i in a.indices) if (a[i] != b[i]) return a[i] > b[i]
+        return false
     }
 
     // Whether the latest release `tag` is worth offering to `current`: any other version, as before,
@@ -50,6 +62,6 @@ object Store : StorePorts {
 
     override fun addOnFetcher(make: () -> ArtifactFetcher): ArtifactFetcher = make()
 
-    const val RELEASES_URL = "https://api.github.com/repos/udhaykumarbala/cleanyourtv-app/releases/latest"
-    const val RELEASE_PAGE = "https://github.com/udhaykumarbala/cleanyourtv-app/releases"
+    const val RELEASES_URL = "https://api.github.com/repos/Eliotm2/cleanyourtv-app/releases/latest"
+    const val RELEASE_PAGE = "https://github.com/Eliotm2/cleanyourtv-app/releases/latest"
 }

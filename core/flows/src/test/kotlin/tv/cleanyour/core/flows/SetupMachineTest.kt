@@ -31,6 +31,10 @@ import tv.cleanyour.core.planner.PlanRequest
 import tv.cleanyour.core.planner.PlanResult
 import tv.cleanyour.core.planner.WizardWifi
 import tv.cleanyour.core.probe.SavedWifi
+import tv.cleanyour.core.spec.LookKeys
+import tv.cleanyour.core.spec.Movement
+import tv.cleanyour.core.spec.PictureKeys
+import tv.cleanyour.core.spec.StyleId
 import tv.cleanyour.core.spec.DockLayers
 import tv.cleanyour.core.spec.LauncherConfigCodec
 import tv.cleanyour.core.spec.LauncherConfigDoc
@@ -167,9 +171,12 @@ class SetupMachineTest {
         settle()
         val last = h.planner.requests.filterIsInstance<PlanRequest.Setup>().last()
         assertEquals(apps.take(12), last.choices.dock)
-        assertEquals(apps.take(12), h.tvs.tvs.value.single().wizard?.dock)
+        // 0.4.0: the draft keeps the whole list (no repeats, up to 24 apps), so more apps in a row
+        // in the look step brings the last two into view; the plan and the sheet show three rows.
+        assertEquals(apps, h.tvs.tvs.value.single().wizard?.dock)
         assertEquals(apps.take(12), m.extras.value.dock.map { it.pkg })
         assertEquals(4, m.extras.value.dockColumns)
+        assertEquals(2, m.extras.value.waiting)
     }
 
     @Test fun keepingAPackageReplansAndPersistsTheDraft() = runTest(timeout = 30.seconds) {
@@ -605,6 +612,48 @@ class SetupMachineTest {
         assertEquals("BANNER_FIRE", d.banner)
     }
 
+    // A TCL UnionTV in India got the China-market 本机信息 steps from the TCL chip: the chip now asks
+    // about the menus first, and only Chinese menus get those steps and the home screen banner.
+    @Test fun theTclChipAsksAboutTheMenusBeforeAnySteps() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        val m = h.setup(backgroundScope)
+        m.dispatch(SetupIntent.EnterAddress("192.168.1.50")); settle()
+        m.dispatch(SetupIntent.ChangeFamily("TCL")); settle()
+        val asking = assertIs<SetupState.OpenDoor>(m.state.value)
+        assertEquals(Families.TCL_ASK, asking.family)
+        assertNull(asking.banner)
+        assertEquals(DoorPhase.STEPS, asking.phase)
+
+        m.dispatch(SetupIntent.ChangeFamily(Families.ofTclMenus(chinese = false))); settle()
+        val global = assertIs<SetupState.OpenDoor>(m.state.value)
+        assertEquals(Families.TCL_GLOBAL, global.family)
+        assertNull(global.banner)
+
+        // Changing the answer (back through the chip) works the other way too.
+        m.dispatch(SetupIntent.ChangeFamily("TCL")); settle()
+        assertEquals(Families.TCL_ASK, assertIs<SetupState.OpenDoor>(m.state.value).family)
+        m.dispatch(SetupIntent.ChangeFamily(Families.ofTclMenus(chinese = true))); settle()
+        val china = assertIs<SetupState.OpenDoor>(m.state.value)
+        assertEquals(Families.TCL, china.family)
+        assertEquals("BANNER_TCL", china.banner)
+        assertEquals("192.168.1.50", china.tv.host)
+    }
+
+    @Test fun brandChipsMapToTheirFamilies() {
+        assertEquals(Families.TCL_ASK, Families.ofBrand("TCL"))
+        assertEquals(Families.TCL_ASK, Families.ofBrand("tcl"))
+        assertEquals(Families.ATV, Families.ofBrand("Xiaomi"))
+        assertEquals(Families.GTV, Families.ofBrand("Google"))
+        assertEquals(Families.FIRE, Families.ofBrand("Amazon"))
+        assertEquals(Families.UNKNOWN, Families.ofBrand("Other"))
+        assertEquals(Families.TCL_GLOBAL, Families.ofTclMenus(chinese = false))
+        assertEquals(Families.TCL, Families.ofTclMenus(chinese = true))
+        // Every family the screen can be sent is one the machine takes as it is.
+        assertTrue(Families.TCL_ASK in Families.all && Families.TCL_GLOBAL in Families.all && Families.TCL in Families.all)
+        // A TCL found on the network still gets the generic steps, never the China-market ones.
+        assertEquals(Families.UNKNOWN, Families.of(FoundTv("192.168.1.71", "TCL C635", "C635", emptySet(), true, null, null, 0L)))
+    }
+
     @Test fun wrongTvAtARememberedAddressShowsTheIdentityCard() = runTest(timeout = 30.seconds) {
         val h = Harness()
         val other = Samples.tv().copy(id = TvId("0123456789abcdef"))
@@ -686,22 +735,25 @@ class SetupMachineTest {
         val m = h.setup(backgroundScope)
         toFound(h, m)
         fun last() = h.planner.requests.filterIsInstance<PlanRequest.Setup>().last()
-        // RFC-CARDS-1: module_cards is always written, off on a first Setup.
-        fun expected(doc: LauncherConfigDoc, dock: List<PackageName>) = LauncherConfigCodec.encode(DockLayers.applyTo(doc, dock).copy(moduleCards = false))
-        // The first plan: the picked dock on the launcher's own look.
-        val first = expected(LauncherConfigDoc(), listOf(PackageName("com.netflix.ninja")))
-        assertTrue(first.contentEquals(h.blobs.bytes(assertNotNull(last().config))))
+        // RFC-CARDS-1: module_cards is always written, off on a first Setup. 0.4.0: fill_dock false.
+        // look2: Setup sends the new form; a TV never customised has Setup's Default look (Classic,
+        // no picture, 4 apps in a row), and this 1 GB TV gets Quick movement.
+        fun expected(dock: List<PackageName>) = LauncherConfigCodec.encode(LookKeys.build(LookKeys.spec(StyleId.CLASSIC, movement = Movement.QUICK),
+            PictureKeys(false, "#000000", 0, 0), 4, dock, cards = false))
+        // The first plan: the picked dock on Setup's Default look.
+        val first = expected(listOf(PackageName("com.netflix.ninja")))
+        assertEquals(first.decodeToString(), h.blobs.bytes(assertNotNull(last().config)).decodeToString())
         assertNull(last().wallpaper)
-        // A look and a dock with a row under it: one config.json with both.
+        // A look and a dock with a row under it: one config.json with both. Aurora migrates to
+        // Classic with the Aurora picture, which this phone's gallery does not have: no picture.
         val apps = List(6) { PackageName("com.example.app$it") }
         m.dispatch(SetupIntent.SetTheme("aurora")); settle()
         m.dispatch(SetupIntent.SetDock(apps)); settle()
-        val aurora = h.themes.bundled().single { it.id == "aurora" }
-        val bytes = expected(aurora.doc, apps)
+        val bytes = expected(apps)
         val sent = assertNotNull(last().config)
-        assertTrue(bytes.contentEquals(h.blobs.bytes(sent)), "the blob is DockLayers' bytes for the dock and the look")
+        assertEquals(bytes.decodeToString(), h.blobs.bytes(sent).decodeToString(), "the blob is the look's bytes for the dock")
         assertEquals(sha256Of(bytes), sent.sha256)
-        assertEquals(aurora.wallpaper, last().wallpaper)
+        assertNull(last().wallpaper)
         assertEquals(1, assertIs<tv.cleanyour.core.spec.DecodeResult.Ok>(LauncherConfigCodec.decode(bytes)).doc.rowsBelowDock)
         // The run pushes it; Done remembers what it pushed.
         h.engine.onStart = { p ->
@@ -715,7 +767,8 @@ class SetupMachineTest {
         assertEquals(sha256Of(bytes), h.tvs.tvs.value.single().launcher?.ourOverlayDigest)
         assertEquals(sha256Of(bytes), h.tvs.tvs.value.single().launcher?.overlayDigest)
         // RFC-CARDS-1: Manage starts from what the run pushed: the dock, the look and cards off.
-        assertEquals(HomeChoice(apps, "aurora", cards = false), HomePrefs(h.documents).load(h.tvs.tvs.value.single().id))
+        val saved = assertNotNull(HomePrefs(h.documents).load(h.tvs.tvs.value.single().id))
+        assertEquals(listOf<Any?>(apps, false, "classic", LookPicture.NONE_ID, 4), listOf(saved.dock, saved.cards, saved.style, saved.picture, saved.columns))
     }
 
     // RFC-CARDS-1: the first Setup never turns module cards on, so the new home screen never asks
