@@ -2,6 +2,7 @@ package tv.cleanyour.core.flows
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import tv.cleanyour.core.model.EnabledState
 import tv.cleanyour.core.model.GroupDefault
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.Op
@@ -91,6 +92,11 @@ class SwitchedOffMachine(
         }
     }
 
+    // Fork (Thomas): the pill shows what the TV says, not only what this app switched off: an app off
+    // from an earlier cleanup (another app, the TV itself) reads "Off", and tapping it puts it back
+    // (the planner's putBack enables whatever the snapshot shows off).
+    private fun offOnTv(e: EnabledState?): Boolean = e == EnabledState.DISABLED_USER || e == EnabledState.DISABLED
+
     private suspend fun load() {
         val tv = d.tv(tvId) ?: return
         val off = d.ledger.switchedOffByUs(tvId)
@@ -107,7 +113,7 @@ class SwitchedOffMachine(
         val rest = off.filterNot { it in placed }.map { row(it, true) }
         val all = byGroup + listOfNotNull(if (rest.isEmpty()) null else OffGroup("other", "", rest))
         val ask = if (tv.level == Level.CUSTOM) groups.filter { it.default == GroupDefault.ASK }.map { g ->
-            OffGroup(g.id, g.title, g.packages.filter { labels.containsKey(it.name) && !keptOn(it.name) }.map { row(it.name, it.name in off) })
+            OffGroup(g.id, g.title, g.packages.filter { labels.containsKey(it.name) && !keptOn(it.name) }.map { row(it.name, it.name in off || offOnTv(labels[it.name]?.enabled)) })
         }.filter { it.rows.isNotEmpty() } else emptyList()
         send(Loaded(SwitchedOffState(tv.nickname, tv.level, all, ask, null, loading = false, count = off.size)))
     }

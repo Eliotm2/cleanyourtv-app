@@ -109,6 +109,35 @@ class StoreRulesTest {
         assertEquals(null, m.state.value.install)
     }
 
+    // Fork (Thomas): an ask row the TV shows off, switched off by something else (an earlier cleanup
+    // with another app), reads "Off", and its pill puts it back; the TCL Alexa case.
+    @Test fun anAskRowOffOnTheTvReadsOffEvenWhenThisAppDidNotSwitchItOff() = runTest(timeout = 30.seconds) {
+        val alexa = PackageName("com.tcl.smartalexa")
+        val other = PackageName("com.google.android.katniss")
+        val on = PackageState(EnabledState.ENABLED, true, 1, null, false, false, null, false)
+        val profile = miProfile.copy(groups = listOf(
+            PackageGroup("voice", "Voice assistant", GroupDefault.ASK, listOf(PackageEntry(alexa, null), PackageEntry(other, null))),
+        ))
+        val h = Harness()
+        val tv = h.knownTv().copy(level = Level.CUSTOM).also { t ->
+            h.tvs.upsert(t)
+            h.snapshots.save(Samples.snapshot(packages = Samples.miTvPackages(emptySet()) + mapOf(alexa to on.copy(enabled = EnabledState.DISABLED_USER), other to on),
+                takenAtMs = Samples.NOW_MS + 1_000))
+        }
+        val previous = h.planner.respond
+        h.planner.respond = { r, snap ->
+            if (r is PlanRequest.PutBack) PlanResult.Ok(h.plan(listOf(Op.Enable(r.pkg)), kind = PlanKind.PUT_BACK, id = "01FAKEPUTB00000000000000002"))
+            else previous(r, snap)
+        }
+        val m = SwitchedOffMachine(h.manageDeps(profiles = FakeProfileSource(listOf(profile))), backgroundScope, tv.id)
+        settle()
+        val rows = m.state.value.askGroups.flatMap { it.rows }.associate { it.pkg to it.off }
+        assertEquals(mapOf(alexa to true, other to false), rows)
+        assertTrue(m.state.value.groups.isEmpty(), "this app switched nothing off")
+        m.dispatch(SwitchedOffIntent.SetOff(alexa, false)); settle()
+        assertTrue(h.planner.requests.any { it == PlanRequest.PutBack(alexa) })
+    }
+
     // RF-STORES-030 M2: at the Custom level, Switched off lists the profile's ask groups with Off and
     // Kept pills. The Play build keeps the TV's updaters on, so an updater (by name, or in the
     // "Software updates" group) gets no pill there, and putting back one an earlier full build had
