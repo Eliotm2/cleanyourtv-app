@@ -7,7 +7,7 @@ son propre point de restauration.
 
 ## Ce que le fork change
 
-- **Launcher embarqué** : le fork du launcher (`Eliotm2/cleanyourtv`, branche `thomas`, 3.0-thomas.5, versionCode 14 :
+- **Launcher embarqué** : le fork du launcher (`Eliotm2/cleanyourtv`, branche `thomas`, 3.0-thomas.6, versionCode 15 :
   le launcher 3.0 amont b06ab21 plus nos ajouts) à la place du launcher amont épinglé, signé avec la clé du fork, comme le rideau TV (`tv/curtain`, reconstruit et
   re-signé) et l'appli elle-même. Les épingles sont dans `core/trust/.../Pins.kt` ; `verifyLauncherPin` et
   `verifyCurtainPin` tournent à chaque compilation.
@@ -38,6 +38,14 @@ son propre point de restauration.
 - Chaînes du fork en anglais et en français (`feature/manage/res/values-fr`) ; le reste de l'appli reste en anglais.
 - Tests : `LauncherPinTest` et `FullStoreTest` suivent le fork ; `PlannerTest.installApkFromThePhone` et quatre
   captures Roborazzi (`installapk_*`) ajoutés. Robolectric lit ses jars sur le miroir Google de Maven Central.
+
+## À chaque reprise : vérifier ce que l'amont fait maintenant
+
+À chaque reprise manuelle (et quand la reprise de nuit s'arrête), comparer les nouveautés de l'amont (CHANGELOG,
+options du Look, nouvelles clés du launcher) avec nos ajouts : ce que l'amont fait désormais est retiré de notre côté
+au profit du sien. Procédure et historique dans `FORK-THOMAS.md` du launcher (`Eliotm2/cleanyourtv`). Déjà retirés :
+`ForkLook` (5 apps par rangée, remplacé par « apps in a row » de la 0.4.0) et `dock_bottom_room` du launcher
+(remplacé par « Every app in one row », `single_row`, de la 0.4.5).
 
 ## Reprise automatique de l'original
 
