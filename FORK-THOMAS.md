@@ -1,14 +1,14 @@
 # Fork « thomas » de l'appli téléphone Clean Your TV
 
-Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.0, MIT).
+Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.5, MIT).
 Identifiant d'appli `fr.thomas.cleanyourtv` (amont : `tv.cleanyour.app`), nom « Clean Your TV · Thomas », versions
-`<amont>-thomas.N` (0.4.0-thomas.1 à la reprise de la 0.4.0) : elle s'installe à côté de l'appli d'origine, qui garde
+`<amont>-thomas.N` (0.4.5-thomas.1 à la reprise de la 0.4.5) : elle s'installe à côté de l'appli d'origine, qui garde
 son propre point de restauration.
 
 ## Ce que le fork change
 
-- **Launcher embarqué** : le fork du launcher (`Gathin23/cleanyourtv`, branche `thomas`, 3.0-thomas.1, versionCode 10)
-  à la place du launcher amont 2.7, signé avec la clé du fork, comme le rideau TV (`tv/curtain`, reconstruit et
+- **Launcher embarqué** : le fork du launcher (`Eliotm2/cleanyourtv`, branche `thomas`, 3.0-thomas.5, versionCode 14 :
+  le launcher 3.0 amont b06ab21 plus nos ajouts) à la place du launcher amont épinglé, signé avec la clé du fork, comme le rideau TV (`tv/curtain`, reconstruit et
   re-signé) et l'appli elle-même. Les épingles sont dans `core/trust/.../Pins.kt` ; `verifyLauncherPin` et
   `verifyCurtainPin` tournent à chaque compilation.
 - **Installer une appli (APK)** : Manage › « Install an app ». Un fichier APK choisi sur le téléphone (sélecteur
@@ -24,6 +24,9 @@ son propre point de restauration.
   consentement et `DefaultPlanner.launcherInstall` ajoute l'étape. En thomas.3, l'étape d'installation qui suit cette
   désinstallation ne déclare plus « absent avant » : la relecture du moteur au lancement voyait l'ancienne copie encore
   là, jugeait le plan périmé et l'appli rebouclait sur un nouveau plan.
+- **Switched off** (0.4.0-thomas.2) : au niveau Custom, les pastilles des groupes « ask » suivent l'état réel de la
+  télé ; une appli coupée par un nettoyage antérieur (une autre appli) peut être remise.
+- **Tests alignés sur `pm uninstall` sans `--user 0`** (EngineTest, golden undo-everything-remove-launcher).
 - **Vérification de mise à jour** (0.4.0-thomas.1) : « Check for updates » lit les releases de ce fork
   (`Eliotm2/cleanyourtv-app`), signées avec la clé du fork, et ouvre la page de la dernière. Une version amont n'est
   jamais proposée : elle ne pourrait pas s'installer par-dessus cette clé. Ordre : la version amont, puis le numéro
