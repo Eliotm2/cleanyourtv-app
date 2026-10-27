@@ -27,12 +27,12 @@ object TrustRoots {
 // :android:platform preBuild) fails the build when the asset differs.
 object PinnedLauncher {
     const val ASSET_NAME = "cleanyourtv-launcher.apk"
-    const val UPSTREAM_COMMIT = "8fde28b"
+    const val UPSTREAM_COMMIT = "ddbaa60"
     const val PACKAGE = "com.gathin.tvhome"
-    const val VERSION_CODE = 15L
-    const val VERSION_NAME = "3.0-thomas.6"
-    const val SIZE = 543_285L
-    const val SHA256 = "25687596a6b8ff3d148eba1273d7bb9b8b7ce44e992711e12813f6de6343af99"
+    const val VERSION_CODE = 16L
+    const val VERSION_NAME = "3.0-thomas.7"
+    const val SIZE = 543_421L
+    const val SHA256 = "193021421da51ff5269edb2ac682497ee9b34f6c4e2a244573a7c8b375948fb7"
     // SHA-256 of the signing certificate (DER), "CN=Accueil TV, O=Thomas, C=FR", v2 and v3.
     const val SIGNER_SHA256 = "fa73a3a033c6bb075706307ff446928530b90305a198b4349b02c4ce1eae29d5"
 }
