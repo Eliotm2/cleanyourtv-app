@@ -74,6 +74,7 @@ import tv.cleanyour.core.session.TvSession
 import tv.cleanyour.core.spec.AppNames
 import tv.cleanyour.core.spec.DockLayers
 import tv.cleanyour.core.spec.FactsTable
+import tv.cleanyour.core.spec.LiveTvKeys
 import tv.cleanyour.core.spec.Looks
 import tv.cleanyour.core.spec.PictureSource
 import tv.cleanyour.core.spec.ProfileResolution
@@ -812,7 +813,7 @@ class SetupMachine(
             dock = null, themeId = lookId, keepDebuggingOn = false, planId = null, updatedAtMs = now,
             columns = drafts.override(lookId, saved?.takeUnless { it.isNew }?.columns),
             picture = saved?.takeUnless { it.isNew }?.picture?.takeUnless { Looks.dated(lookId) },
-            look = saved?.takeIf { it.isNew }?.let { HomePrefs.encode(it.copy(dock = emptyList(), cards = null)) })
+            look = saved?.takeIf { it.isNew }?.let { HomePrefs.encode(it.copy(dock = emptyList(), cards = null, dockChosen = true)) })
         val tv = Tv(
             id = s.tvId, nickname = name, room = existing?.room, facts = facts,
             endpoints = listOfNotNull(host).ifEmpty { existing?.endpoints.orEmpty() },
@@ -968,11 +969,14 @@ class SetupMachine(
         val lookApps = kept.map { p -> AppChoice(p, label(p)) }
         val keyNames = lookContext.keyNames || (deps.documents?.let { docs -> attempt { AppPrefs(docs).load() }.getOrNull()?.lookKeyNames } ?: false)
         val candidates = DockCandidates.of(snap, launchable, profile(), deps.facts).map { AppChoice(it, label(it)) }.sortedBy { it.name.lowercase() }
+        // 0.4.7: a dock the person set in Customise keeps its free spaces empty; the picked one fills them.
         lookContext = LookContext(apps = lookApps, others = candidates.filter { it.pkg !in kept }, mine = mine, new = new, tv = tvLook, cards = cards,
-            keyNames = keyNames)
+            keyNames = keyNames, dockChosen = draft.dock != null)
         val sheet = mutableExtras.value.look?.let { drafts.refresh(it, lookContext) } ?: drafts.open(choice, lookContext)
+        // 0.4.7: the TV's Live TV app (LiveTvKeys, as Manage's LookCarry), not one switched off here.
+        val liveTv = LiveTvKeys.pick(profile(), snap.packages, draft.extraOff)
         val look = if (!possible && !helper) null else attempt { val (doc, w) = drafts.docOf(sheet, dock, cards, lookContext)
-            Look.encode(deps.encoder, deps.blobs, if (helper) HomeHelperKeys.with(doc, helperStock!!.pkg) else doc, w) }
+            Look.encode(deps.encoder, deps.blobs, LiveTvKeys.apply(if (helper) HomeHelperKeys.with(doc, helperStock!!.pkg) else doc, liveTv), w) }
             .onFailure { deps.log.line("setup: the look could not be encoded, planned without it") }.getOrNull()
         // What Manage starts from once the run pushed it, saved as the Look sheet saves it, in the new
         // form: a photo made here is kept for the TV (and saved as "mine") only once the TV has it.
@@ -983,7 +987,7 @@ class SetupMachine(
             chosen == LookPicture.MINE_ID -> saved?.dim ?: OwnPicture.DEFAULT_DIM
             else -> null
         }
-        setupHome = look?.let { SetupHome(it.digest, drafts.choiceOf(sheet, saved, kept, cards, chosen, dim), photo?.takeIf { sendsNew }, saved) }
+        setupHome = look?.let { SetupHome(it.digest, drafts.choiceOf(sheet, saved, kept, cards, chosen, dim, dockChosen = draft.dock != null), photo?.takeIf { sendsNew }, saved) }
         // RFC-CURTAIN-1: the TV shows the progress unless Custom switched it off (Simple never shows
         // the switch). An asset that does not match its pin is never offered; the plan goes without it.
         val showOnTv = draft.level == Level.SIMPLE || draft.curtain

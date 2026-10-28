@@ -45,13 +45,19 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   and "Undo".
 - Setup's Customise names the look you picked ("Classic with your photo", "Glass with Mist")
   instead of "Look: Default".
-- A TV that got a new address on your Wi-Fi (a mesh network, a new router) is found again: when
-  its saved address does not answer, the app looks for it on the network, checks it is the same
-  TV with the key it already allowed, and saves the new address. No other TV is connected, and
-  none shows an Allow prompt.
 - When the TV turns its own home screen back on behind the app (the XGIMI MoGo 3 Pro does on some
   remote buttons), Manage's Home screen row says so with "Run Setup again" first, and a problem
   report has the line.
+
+### The dock and Live TV
+- Inputs on the new home screen now has a Live TV row on TVs whose Live TV app is not MediaTek's
+  (TCL, Sony, Philips, Xiaomi and most others): Setup and every dock or look change tell the new
+  home screen which app is the TV's Live TV, when that app is on the TV and switched on.
+- A Live TV tile the app put in the dock now shows on MediaTek TVs; the new home screen hid it.
+- The dock no longer shows empty spaces when the app picked it: spaces it could not fill (too few
+  apps, or one the TV no longer has) take the next apps, as the new home screen does on its own. A
+  dock you set yourself keeps its empty spaces. A TV set up before this version keeps its dock as it
+  is until Setup runs again.
 
 ### Reports
 - "Help add this TV" remembers that this TV's report was sent and when, on the report screen, on
@@ -78,6 +84,14 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   What we found, Customise, Done, Manage and the Home screen page say so instead of "the TV keeps
   its own home screen", and the helper's Switch off replaces "Use the TV's own home screen". Its
   look goes through the launcher's ThemeProvider where the look does.
+
+## 0.4.6.1 (2026-10-28)
+
+- A TV that got a new address on your Wi-Fi (after a TV update, a mesh network or a new router)
+  is found again: when its saved address does not answer, the app looks for it on the network,
+  checks it is the same TV with the key it already allowed, and saves the new address. Before,
+  the app waited at "Waiting for the TV..." for good. No other TV is connected, and none shows
+  an Allow prompt.
 
 ## 0.4.6 (2026-10-28)
 
