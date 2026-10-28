@@ -78,7 +78,18 @@ class RendererPropertyTest {
     private fun cue() = Op.CurtainCue(curtain, token(), CurtainStage.entries[rnd.nextInt(CurtainStage.entries.size)], rnd.nextInt(0, 1000), rnd.nextInt(0, 1000),
         CurtainGroup.entries[rnd.nextInt(CurtainGroup.entries.size)], rnd.nextInt(0, 1000), rnd.nextInt(0, 1000))
 
-    private fun anyOp(): Op = when (rnd.nextInt(23)) {
+    // RFC-HELPER-1: the helper's three ops, with lists that do and do not name it.
+    private val service = HelperLines.SERVICE
+    private fun listWithout(): String? = if (rnd.nextInt(3) == 0) null else componentList()
+    private fun listWith(): String = (HelperLines.entries(listWithout()) + service.flat).shuffled(rnd).joinToString(":")
+    private fun helperOp(): Op = when (rnd.nextInt(4)) {
+        0 -> Op.AccessibilityAdd(listWithout(), service)
+        1 -> Op.AccessibilityRemove(listWith(), service)
+        2 -> Op.AccessibilityRemove(null, service, rnd.nextBoolean())
+        else -> Op.ArmHelperWatchdog(service, rnd.nextInt(30, 301), token(), rnd.nextBoolean())
+    }
+
+    private fun anyOp(): Op = when (rnd.nextInt(24)) {
         0 -> Op.Disable(pkg())
         1 -> Op.Enable(pkg())
         2 -> Op.DefaultState(pkg())
@@ -101,6 +112,7 @@ class RendererPropertyTest {
         19 -> Op.Settle(rnd.nextInt(1, 61))
         20 -> Op.Reboot
         21 -> cue()
+        22 -> helperOp()
         else -> Op.DebugOff
     }
 
@@ -116,6 +128,12 @@ class RendererPropertyTest {
                 assertEquals(listOf("rm", "-f", "/data/local/tmp/cleanyourtv/home-ok-" + op.token.value), ShellTokens.tokenize(r.lines[0].text))
                 assertTrue(ShellTokens.LINE_RE.matches(r.lines[1].text))
                 assertTrue(Watchdog.matches(WatchdogVariant.NOHUP_SETSID, r.lines[1].text, op.stock, op.seconds, op.token))
+                return@repeat
+            }
+            // RFC-HELPER-1: one HelperLines template each (the timer after its token file removal).
+            if (op is Op.AccessibilityAdd || op is Op.AccessibilityRemove || op is Op.ArmHelperWatchdog) {
+                r.lines.forEach { assertTrue(ShellTokens.LINE_RE.matches(it.text), it.text) }
+                assertTrue(helperLineIsItsTemplate(op, r.lines.last().text), r.lines.last().text)
                 return@repeat
             }
             for (line in r.lines) {
@@ -142,7 +160,8 @@ class RendererPropertyTest {
     // (GuardRevival needs `cmd notification allow_listener`), never grants it WRITE_SECURE_SETTINGS
     // (`pm grant`, which also guards GuardConfig) and never broadcasts to it; its only accessibility
     // writes are SettingsPut of the two accessibility settings with the op's own value, which the
-    // planner uses only to put back the list the TV had (restoreAccessibility, Launcher24PlanTest).
+    // planner uses only to put back the list the TV had (restoreAccessibility, Launcher24PlanTest),
+    // and, since RFC-HELPER-1 (test build), the Home button helper's templates for HomeKeyService alone.
     // Pinned for every op kind, random ones and ones aimed at the launcher's 3.0 components.
     @Test fun noOpApprovesGrantsOrSwitchesOnTheLaunchersHelpers() {
         val tvhome = PackageName("com.gathin.tvhome")
@@ -165,6 +184,14 @@ class RendererPropertyTest {
                     assertTrue(forbidden.none { it in line.text } && "WRITE_SECURE_SETTINGS" !in line.text, line.text)
                     continue
                 }
+                // RFC-HELPER-1: the only lines that write the list outside SettingsPut are the helper's
+                // templates, for our HomeKeyService alone, and none of them switches accessibility on.
+                if ((op is Op.AccessibilityAdd || op is Op.AccessibilityRemove || op is Op.ArmHelperWatchdog) && line.text == renderer.render(op).lines.last().text) {
+                    assertTrue(forbidden.none { it in line.text } && "WRITE_SECURE_SETTINGS" !in line.text, line.text)
+                    assertTrue(helperLineIsItsTemplate(op, line.text), line.text)
+                    assertTrue("accessibility_enabled 1" !in line.text && "accessibility_enabled '1'" !in line.text, line.text)
+                    continue
+                }
                 val argv = ShellTokens.tokenize(line.text)
                 assertTrue(argv.none { it in forbidden }, line.text)
                 assertTrue(argv.none { "WRITE_SECURE_SETTINGS" in it || "BIND_NOTIFICATION_LISTENER" in it }, line.text)
@@ -179,6 +206,13 @@ class RendererPropertyTest {
                 }
             }
         }
+    }
+
+    private fun helperLineIsItsTemplate(op: Op, line: String): Boolean = when (op) {
+        is Op.AccessibilityAdd -> op.component == service && HelperLines.matchesAdd(line, op.expected, op.component)
+        is Op.AccessibilityRemove -> op.component == service && line == (op.expected?.let { HelperLines.casRemove(it, op.component) } ?: HelperLines.tvRemove(op.component, op.offIfEmpty))
+        is Op.ArmHelperWatchdog -> op.component == service && HelperLines.matchesWatchdog(line, WatchdogVariant.NOHUP_SETSID, op.component, op.seconds, op.token, op.offIfEmpty)
+        else -> false
     }
 
     // RFC-CURTAIN-1: every cue is one fixed argv: constant words, the token, two enum names and four
@@ -225,6 +259,8 @@ class RendererPropertyTest {
             )
             val inverse = renderer.inverse(op, prior) ?: return@repeat
             val r = renderer.render(inverse)
+            // RFC-HELPER-1: the add's inverse is the helper's TV-side removal template.
+            if (inverse is Op.AccessibilityRemove) { assertTrue(helperLineIsItsTemplate(inverse, r.lines.single().text)); return@repeat }
             r.lines.forEach { ShellTokens.assertLine(it.text) }
         }
     }

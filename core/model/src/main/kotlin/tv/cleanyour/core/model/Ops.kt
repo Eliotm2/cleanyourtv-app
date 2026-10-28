@@ -52,6 +52,18 @@ sealed interface Op {
     // RFC-CURTAIN-1: one am broadcast to the curtain's receiver. count and total are the switch-offs
     // over the whole plan, groupCount and groupTotal those of `group`; every number is 0 to 999.
     data class CurtainCue(val receiver: Component, val token: RunToken, val stage: CurtainStage, val count: Int, val total: Int,
-        val group: CurtainGroup = CurtainGroup.NONE, val groupCount: Int = 0, val groupTotal: Int = 0) : Op }
+        val group: CurtainGroup = CurtainGroup.NONE, val groupCount: Int = 0, val groupTotal: Int = 0) : Op
+    // RFC-HELPER-1 (test build, cyt.homeHelper): the Home button helper, the launcher's HomeKeyService.
+    // AccessibilityAdd: one TV-side compare-and-set line that appends `component` to
+    // enabled_accessibility_services only while the list still reads `expected` (null: unset or empty).
+    // AccessibilityRemove: with `expected`, the same compare-and-set to `expected` minus `component`
+    // (in its short and full class forms), every other entry as it was; with null, the TV reads the
+    // list and takes out only that entry (Undo's inverse and the laptop scripts), and `offIfEmpty`
+    // then also writes accessibility_enabled 0 when nothing is left.
+    // ArmHelperWatchdog: the safety timer of the helper's check, the HOME watchdog's twin; when the
+    // phone does not defuse it, it takes `component` out of the list itself (offIfEmpty as above).
+    data class AccessibilityAdd(val expected: String?, val component: Component) : Op
+    data class AccessibilityRemove(val expected: String?, val component: Component, val offIfEmpty: Boolean = false) : Op
+    data class ArmHelperWatchdog(val component: Component, val seconds: Int, val token: RunToken, val offIfEmpty: Boolean) : Op }
 
 data class ChangeRecord(val planId: PlanId, val step: Int, val op: Op, val prior: Prior?, val atMs: Long)   // R0: 1 derived from journals, for undo and restore files

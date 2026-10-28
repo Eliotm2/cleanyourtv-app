@@ -172,7 +172,28 @@ class ModelTv(snapshot: Snapshot) {
         is Op.SettingsPut -> Prior(settingValue = settings[op.key])
         is Op.Install -> Prior(present = op.pkg in packages)
         is Op.InstallStream -> Prior(present = op.pkg in packages)
+        is Op.AccessibilityAdd, is Op.AccessibilityRemove -> Prior(settingValue = settings[SettingKey.ENABLED_ACCESSIBILITY])
         else -> Prior()
+    }
+
+    // RFC-HELPER-1: the helper's compare-and-set as the TV's sh runs it (HelperLinesTest): unset,
+    // empty and "null" read alike; a list that changed is left as it is and nothing is recorded.
+    private fun norm(v: String?) = v?.takeIf { it.isNotEmpty() && it != "null" }
+    private fun helper(op: Op): Boolean {
+        val now = norm(settings[SettingKey.ENABLED_ACCESSIBILITY])
+        return when (op) {
+            is Op.AccessibilityAdd -> if (now != norm(op.expected)) false
+                else { settings[SettingKey.ENABLED_ACCESSIBILITY] = tv.cleanyour.core.ops.HelperLines.appended(op.expected, op.component); true }
+            is Op.AccessibilityRemove -> {
+                if (op.expected != null && now != norm(op.expected)) return false
+                val left = tv.cleanyour.core.ops.HelperLines.without(now, op.component)
+                if (left == now) return false
+                settings[SettingKey.ENABLED_ACCESSIBILITY] = left
+                if (left == null && op.offIfEmpty) settings[SettingKey.ACCESSIBILITY_ENABLED] = "0"
+                true
+            }
+            else -> false
+        }
     }
 
     // True when the op is a change (so a ChangeRecord is kept), as the engine's journal would.
@@ -185,6 +206,7 @@ class ModelTv(snapshot: Snapshot) {
         is Op.Install -> { packages[op.pkg] = PackageState(EnabledState.ENABLED, false, op.versionCode, op.signer, false, false, null, true); true }
         is Op.InstallStream -> { packages[op.pkg] = PackageState(EnabledState.ENABLED, false, op.versionCode, op.signer, false, false, null, true); true }
         is Op.Uninstall -> { packages.remove(op.pkg); claimants.removeAll { it.pkg == op.pkg }; if (home?.pkg == op.pkg) home = claimants.firstOrNull(); true }
+        is Op.AccessibilityAdd, is Op.AccessibilityRemove -> helper(op)
         else -> false
     }
 

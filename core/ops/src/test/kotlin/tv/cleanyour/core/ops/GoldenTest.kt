@@ -40,6 +40,8 @@ class GoldenTest {
             val r = ShellRenderer(c.variant).render(c.op)
             for (line in r.lines) {
                 if (c.op is Op.ArmHomeWatchdog && line === r.lines.last()) continue   // the one multi-command template, checked by WatchdogTest
+                // RFC-HELPER-1: the helper's templates, checked by HelperLinesTest.
+                if ((c.op is Op.AccessibilityAdd || c.op is Op.AccessibilityRemove || c.op is Op.ArmHelperWatchdog) && line === r.lines.last()) continue
                 ShellTokens.assertLine(line.text)
                 assertTrue(ShellTokens.tokenize(line.text).isNotEmpty(), c.name)
             }

@@ -108,7 +108,20 @@ object GoldenCases {
         GoldenCase("57-cue-install", "Curtain cue: the new home screen is being installed", cue(CurtainStage.INSTALL), null),
         GoldenCase("58-cue-installed", "Curtain cue: the new home screen is installed", cue(CurtainStage.INSTALLED), null),
         GoldenCase("59-cue-finale", "Curtain cue: the finale, before Home switches over", cue(CurtainStage.FINALE), null),
+        // RFC-HELPER-1 (test build): the Home button helper.
+        GoldenCase("60-helper-add-unset", "Home button helper: added to an unset list", Op.AccessibilityAdd(null, HelperLines.SERVICE), Prior()),
+        GoldenCase("61-helper-add-after-reader", "Home button helper: appended after a screen reader, compare-and-set",
+            Op.AccessibilityAdd(READER, HelperLines.SERVICE), Prior(settingValue = READER)),
+        GoldenCase("62-helper-remove", "Home button helper: taken out, the reader kept, compare-and-set",
+            Op.AccessibilityRemove("$READER:${HelperLines.SERVICE.flat}", HelperLines.SERVICE), Prior(settingValue = "$READER:${HelperLines.SERVICE.flat}")),
+        GoldenCase("63-helper-remove-last", "Home button helper: taken out as the last entry, the list deleted",
+            Op.AccessibilityRemove(HelperLines.SERVICE.flat, HelperLines.SERVICE), Prior(settingValue = HelperLines.SERVICE.flat)),
+        GoldenCase("64-helper-remove-on-tv", "Home button helper: taken out of the list the TV has now, accessibility off when it was the last",
+            Op.AccessibilityRemove(null, HelperLines.SERVICE, offIfEmpty = true), null),
+        GoldenCase("65-helper-timer", "Home button helper: the safety timer of its check",
+            Op.ArmHelperWatchdog(HelperLines.SERVICE, 150, token, offIfEmpty = true), null),
     )
+    const val READER = "com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService"
 }
 
 // The readable form of an op and of a rendering, shared by the golden files and the test messages.
@@ -143,6 +156,9 @@ object GoldenText {
         Op.Reboot -> "Reboot"
         Op.DebugOff -> "DebugOff"
         is Op.CurtainCue -> "CurtainCue receiver=${op.receiver.flat} token=${op.token.value} stage=${op.stage.name} count=${op.count} total=${op.total} group=${op.group.name} groupCount=${op.groupCount} groupTotal=${op.groupTotal}"
+        is Op.AccessibilityAdd -> "AccessibilityAdd expected=${op.expected ?: "null"} component=${op.component.flat}"
+        is Op.AccessibilityRemove -> "AccessibilityRemove expected=${op.expected ?: "null"} component=${op.component.flat} offIfEmpty=${op.offIfEmpty}"
+        is Op.ArmHelperWatchdog -> "ArmHelperWatchdog component=${op.component.flat} seconds=${op.seconds} token=${op.token.value} offIfEmpty=${op.offIfEmpty}"
     }
 
     fun blob(b: BlobRef) = "${b.sha256.hex}:${b.size}:${b.path}"

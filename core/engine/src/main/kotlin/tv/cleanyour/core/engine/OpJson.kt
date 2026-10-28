@@ -77,6 +77,10 @@ object OpJson {
                 put("v", "curtain_cue"); put("receiver", op.receiver.flat); put("token", op.token.value); put("stage", op.stage.name)
                 put("count", op.count); put("total", op.total); put("group", op.group.name); put("groupCount", op.groupCount); put("groupTotal", op.groupTotal)
             }
+            // RFC-HELPER-1
+            is Op.AccessibilityAdd -> { put("v", "accessibility_add"); if (op.expected != null) put("expected", op.expected); put("component", op.component.flat) }
+            is Op.AccessibilityRemove -> { put("v", "accessibility_remove"); if (op.expected != null) put("expected", op.expected); put("component", op.component.flat); put("offIfEmpty", op.offIfEmpty) }
+            is Op.ArmHelperWatchdog -> { put("v", "arm_helper_watchdog"); put("component", op.component.flat); put("seconds", op.seconds); put("token", op.token.value); put("offIfEmpty", op.offIfEmpty) }
         }
     }
 
@@ -116,6 +120,9 @@ object OpJson {
         "debug_off" -> Op.DebugOff
         "curtain_cue" -> Op.CurtainCue(component(o.str("receiver")), RunToken(o.str("token")), CurtainStage.valueOf(o.str("stage")),
             o.int("count"), o.int("total"), CurtainGroup.valueOf(o.str("group")), o.int("groupCount"), o.int("groupTotal"))
+        "accessibility_add" -> Op.AccessibilityAdd(o.optStr("expected"), component(o.str("component")))
+        "accessibility_remove" -> Op.AccessibilityRemove(o.optStr("expected"), component(o.str("component")), o.bool("offIfEmpty"))
+        "arm_helper_watchdog" -> Op.ArmHelperWatchdog(component(o.str("component")), o.int("seconds"), RunToken(o.str("token")), o.bool("offIfEmpty"))
         else -> throw IllegalArgumentException("unknown op verb $v")
     }
 

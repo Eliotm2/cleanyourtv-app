@@ -88,6 +88,10 @@ object LogCodes {
         Op.Reboot -> "Reboot"
         Op.DebugOff -> "DebugOff"
         is Op.CurtainCue -> "CurtainCue ${op.stage.name.lowercase()}"
+        // RFC-HELPER-1: how many entries, never their names (another app's service is not named).
+        is Op.AccessibilityAdd -> "AccessibilityAdd ${op.component.flat} after ${tv.cleanyour.core.ops.HelperLines.entries(op.expected).size}"
+        is Op.AccessibilityRemove -> "AccessibilityRemove ${op.component.flat}${if (op.expected == null) " on the TV" else ""}"
+        is Op.ArmHelperWatchdog -> "ArmHelperWatchdog"
     }
 
     // How the profile resolved: "exact <id>", "candidate <id>" (test build: a list not tested yet,

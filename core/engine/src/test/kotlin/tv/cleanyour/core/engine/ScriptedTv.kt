@@ -112,7 +112,32 @@ class ScriptedTv(initial: Snapshot = Samples.miTvSnapshot()) : TvSession {
             "    User 0: ceDataInode=1 installed=true hidden=false suspended=false stopped=false notLaunched=false enabled=$enabled instant=false virtual=false\n"
     }
 
+    // RFC-HELPER-1: the Home button helper's lines as the TV's sh runs them (HelperLinesTest runs the
+    // real ones in sh): the compare-and-set refuses with exit 3 when the list changed, the TV-side
+    // removal takes out only our HomeKeyService. `helperBound`: Android binds it.
+    val helperBound: Boolean get() = tv.cleanyour.core.ops.HelperLines.listed(settings[SettingKey.ENABLED_ACCESSIBILITY]) && settings[SettingKey.ACCESSIBILITY_ENABLED] == "1"
+
+    private fun helperLine(text: String): ExecResult? {
+        if (!text.startsWith("c=\$(settings get secure enabled_accessibility_services); ")) return null
+        val key = SettingKey.ENABLED_ACCESSIBILITY
+        val now = settings[key]?.takeIf { it.isNotEmpty() && it != "null" }
+        if ("sed -E" in text) {
+            val left = tv.cleanyour.core.ops.HelperLines.without(now)
+            if (left != now) {
+                if (left == null) { settings.remove(key); if ("accessibility_enabled 0" in text) settings[SettingKey.ACCESSIBILITY_ENABLED] = "0" } else settings[key] = left
+            }
+            return ok()
+        }
+        val expected = Regex("if \\[ \"\\\$c\" = '([^']*)' \\]").find(text)?.groupValues?.get(1)
+        val unset = "[ -z \"\$c\" ]" in text
+        if (if (unset) now != null else now != expected) return ExecResult(3, "", tv.cleanyour.core.ops.HelperLines.LIST_CHANGED, false, 1)
+        val put = Regex("then settings put secure enabled_accessibility_services '([^']*)'").find(text)?.groupValues?.get(1)
+        if (put != null) settings[key] = put else settings.remove(key)
+        return ok()
+    }
+
     fun run(lineText: String): ExecResult {
+        helperLine(lineText)?.let { return it }
         val line = Recording.normalize(lineText)
         val tokens = line.split(' ')
         fun pkg(i: Int) = PackageName(tokens[i])

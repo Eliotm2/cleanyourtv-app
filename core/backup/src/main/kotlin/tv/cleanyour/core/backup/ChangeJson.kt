@@ -111,6 +111,10 @@ object ChangeJson {
                 put("receiver", op.receiver.flat); put("token", op.token.value); put("stage", op.stage.name)
                 put("count", op.count); put("total", op.total); put("group", op.group.name); put("groupCount", op.groupCount); put("groupTotal", op.groupTotal)
             }
+            // RFC-HELPER-1
+            is Op.AccessibilityAdd -> { put("expected", op.expected); put("component", op.component.flat) }
+            is Op.AccessibilityRemove -> { put("expected", op.expected); put("component", op.component.flat); put("offIfEmpty", op.offIfEmpty) }
+            is Op.ArmHelperWatchdog -> { put("component", op.component.flat); put("seconds", op.seconds); put("token", op.token.value); put("offIfEmpty", op.offIfEmpty) }
         }
     }
 
@@ -142,6 +146,9 @@ object ChangeJson {
         "debug_off" -> Op.DebugOff
         "curtain_cue" -> Op.CurtainCue(component(o.str("receiver")), RunToken(o.str("token")), CurtainStage.valueOf(o.str("stage")),
             o.int("count"), o.int("total"), CurtainGroup.valueOf(o.str("group")), o.int("groupCount"), o.int("groupTotal"))
+        "accessibility_add" -> Op.AccessibilityAdd(o.strOrNull("expected"), component(o.str("component")))
+        "accessibility_remove" -> Op.AccessibilityRemove(o.strOrNull("expected"), component(o.str("component")), o.bool("offIfEmpty"))
+        "arm_helper_watchdog" -> Op.ArmHelperWatchdog(component(o.str("component")), o.int("seconds"), RunToken(o.str("token")), o.bool("offIfEmpty"))
         else -> throw IllegalArgumentException("unknown op type $type")
     }
 
@@ -169,6 +176,9 @@ object ChangeJson {
         Op.Reboot -> "reboot"
         Op.DebugOff -> "debug_off"
         is Op.CurtainCue -> "curtain_cue"
+        is Op.AccessibilityAdd -> "accessibility_add"
+        is Op.AccessibilityRemove -> "accessibility_remove"
+        is Op.ArmHelperWatchdog -> "arm_helper_watchdog"
     }
 
     fun prior(p: Prior): JsonObject = buildJsonObject {

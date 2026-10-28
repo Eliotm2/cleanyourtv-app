@@ -197,6 +197,7 @@ class Harness(val clock: FakeClock = FakeClock(Samples.NOW_MS), val facts: tv.cl
         is tv.cleanyour.core.planner.PlanRequest.WriteRestorePoint -> PlanKind.WRITE_RESTORE_POINT
         tv.cleanyour.core.planner.PlanRequest.Reboot -> PlanKind.REBOOT
         is tv.cleanyour.core.planner.PlanRequest.UpdateLauncher -> PlanKind.UPDATE_LAUNCHER
+        tv.cleanyour.core.planner.PlanRequest.HomeHelperOff -> PlanKind.HOME_HELPER_OFF
     }
 }
 
