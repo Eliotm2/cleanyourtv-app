@@ -21,8 +21,11 @@ sealed interface HomeKept {
     companion object {
         // From the wizard's extras: a switch that failed is this run's news and comes first; else
         // the block Setup decided; null while the new home screen is planned or already on.
+        // RFC-HELPER-1 (test build): with the Home button helper chosen the plan is a redirect, not a
+        // kept home screen: the TV's own stays Home and the Home button opens the new one, so null.
         fun of(e: SetupExtras): HomeKept? = when {
             e.doneHomeKept != null -> SwitchFailed(e.doneHomeKept)
+            e.helperOn -> null
             !e.homePossible -> Blocked(e.homeBlock, e.fireTv, e.brand, e.unknownModel || e.candidateTried)
             else -> null
         }

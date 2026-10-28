@@ -268,8 +268,9 @@ class HomeScreenMachine(
                 attempt { OwnPicture.stage(d, event.jpeg) }.onSuccess { send(OwnPictureStaged(it, dim, event.jpeg)) }
                     .onFailure { effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false)) }
             }
-            HomeScreenIntent.PreviewStock -> after.stock?.let { stock -> scope.launch { send(Preview(writer.preview(tvId, PlanRequest.UseStockHome(stock)))) } }
-            HomeScreenIntent.UseStock -> after.stock?.let { stock -> scope.launch { useStock(stock) } }
+            // RFC-HELPER-1: while the helper is listed the TV's own home screen is Home already (HomeScreen hides the row).
+            HomeScreenIntent.PreviewStock -> after.stock?.takeIf { after.helper?.canSwitchOff != true }?.let { stock -> scope.launch { send(Preview(writer.preview(tvId, PlanRequest.UseStockHome(stock)))) } }
+            HomeScreenIntent.UseStock -> after.stock?.takeIf { after.helper?.canSwitchOff != true }?.let { stock -> scope.launch { useStock(stock) } }
             HomeScreenIntent.PreviewUpdate -> scope.launch { previewUpdate() }
             HomeScreenIntent.UpdateHomeScreen -> scope.launch { update() }
             HomeScreenIntent.RunSetupAgain -> if (after.notOnTv?.setupAgain == true) effect(ManageEffect.Navigate("setup/${tvId.value}"))

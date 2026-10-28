@@ -44,6 +44,8 @@
     <!-- 0.4.7 (UX finding 8): the new home screen is installed but not in use -->
     <string name="manage_row_home_not_in_use">The TV\'s own is in use</string>
     <!-- 0.4.7 (StockHomeBack): Run Setup again is the primary button then -->
+    <!-- RFC-HELPER-1 (test build): the Home button helper is on -->
+    <string name="manage_row_home_helper">The Home button opens it. The TV\'s own stays on.</string>
     <string name="manage_row_home_stock_back">The TV turned its own home screen back on.</string>
     <string name="manage_row_cards">Cards and modules</string>
     <!-- 0.4.7 (UX finding 9): a card installs as an app while the TV keeps its own home screen -->

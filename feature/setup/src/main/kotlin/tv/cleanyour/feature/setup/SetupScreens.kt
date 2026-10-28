@@ -274,6 +274,8 @@ fun FoundScreen(
         }
         // The outcome first, above the fold: the TV keeps its own home screen, and in one line why.
         if (kept != null) KeptRow(kept, Modifier.padding(top = 16.dp), onWhy = { why = true })
+        // RFC-HELPER-1 (test build): the Home button helper's outcome instead.
+        if (extras.helperOn) HelperOutcomeRow(Modifier.padding(top = 16.dp))
         if (extras.unknownModel) {
             if (!nothingToDo) Body(stringResource(R.string.found_unknown_body), Modifier.padding(start = 4.dp, top = 12.dp))
             // 0.4.7: the report sent before, so the same report is not sent again by mistake.
@@ -310,7 +312,8 @@ fun FoundScreen(
             TextActionRow(row, stringResource(R.string.found_home_change), { actions.intent(SetupIntent.Open(Sheet.DOCK)) }, Modifier.padding(top = 8.dp))
             // Issue #275: TCL's firmware sends these remote buttons only to Google TV's own home
             // screen, so the person hears it before the switch, with the way back.
-            if (extras.tclRemoteKeys) Banner(stringResource(R.string.found_tcl_remote_keys), BannerTone.INFO, Modifier.padding(top = 12.dp))
+            // With the Home button helper the TV's own home screen stays Home, so they keep working.
+            if (extras.tclRemoteKeys && !extras.helperOn) Banner(stringResource(R.string.found_tcl_remote_keys), BannerTone.INFO, Modifier.padding(top = 12.dp))
         }
         if (extras.noScreenLock && !nothingToDo) Body(stringResource(R.string.found_no_lock), Modifier.padding(start = 4.dp, top = 12.dp))
         Gap(8.dp)
@@ -336,6 +339,18 @@ internal fun KeptRow(kept: HomeKept.Blocked, modifier: Modifier = Modifier, onWh
     Banner(
         buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Medium)) { append(outcome) }; append("\n"); append(reason) },
         BannerTone.INFO, modifier, icon = CytIcons.Info, actionLabel = stringResource(R.string.kept_why), onAction = onWhy,
+    )
+}
+
+// RFC-HELPER-1 (test build): the outcome with the Home button helper, the same words on What we
+// found, Customise and Done: the Home button opens the new home screen, the TV's own stays on.
+@Composable
+internal fun HelperOutcomeRow(modifier: Modifier = Modifier) {
+    val outcome = stringResource(R.string.helper_outcome)
+    val reason = stringResource(R.string.helper_outcome_body)
+    Banner(
+        buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Medium)) { append(outcome) }; append("\n"); append(reason) },
+        BannerTone.INFO, modifier, icon = CytIcons.Info,
     )
 }
 
@@ -455,6 +470,7 @@ internal fun ColumnScope.CustomiseContent(
         subtitle = stringResource(R.string.customise_nothing_deleted),
     )
     if (kept != null) KeptRow(kept, Modifier.padding(top = 12.dp), onWhy = onWhyKept)
+    if (extras.helperOn) HelperOutcomeRow(Modifier.padding(top = 12.dp))   // RFC-HELPER-1 (test build)
     // "We keep these" holds the protected rows that stay on; a protected row that is off is part of
     // the home screen switch and stays in its group, shown Off with nothing to flip.
     val protectedRows = summary.groups.flatMap { g -> g.rows.filter { it.kept() } }
@@ -466,11 +482,15 @@ internal fun ColumnScope.CustomiseContent(
     val ownHomeOff = stringResource(R.string.customise_own_home_off)
     val wizardKept = stringResource(R.string.customise_wizard_kept)
     val ownHomeKept = stringResource(R.string.customise_own_home_kept)
+    // RFC-HELPER-1 (test build): with the Home button helper both stay on, and the rows say why.
+    val wizardStays = if (extras.helperOn) stringResource(R.string.customise_wizard_helper) else wizardKept
+    val ownHomeStays = if (extras.helperOn) stringResource(R.string.customise_own_home_helper) else ownHomeKept
+    val stays = kept != null || extras.helperOn
     fun RowSummary.item(): DiffItem = when (roles[pkg]) {
         HomeRole.WIZARD -> if (this.off) DiffItem(pkg.value, wizardName, wizardOff, pkg.value, true, fixed = protected)
-            else if (kept != null) DiffItem(pkg.value, friendlyName, wizardKept, pkg.value, false, fixed = false) else toItem()
+            else if (stays) DiffItem(pkg.value, friendlyName, wizardStays, pkg.value, false, fixed = false) else toItem()
         HomeRole.OWN_HOME -> if (this.off && protected) DiffItem(pkg.value, friendlyName, ownHomeOff, pkg.value, true, fixed = true)
-            else if (kept != null && protected) DiffItem(pkg.value, friendlyName, ownHomeKept, pkg.value, false, fixed = false) else toItem()
+            else if (stays && protected) DiffItem(pkg.value, friendlyName, ownHomeStays, pkg.value, false, fixed = false) else toItem()
         null -> toItem()
     }
     // The first group opens; the others wait collapsed until tapped (DESIGN-SYSTEM 8.4, mockup 08).
@@ -486,7 +506,7 @@ internal fun ColumnScope.CustomiseContent(
     // UX finding 15: a PatchWall tap that changes the home screen decision says so. PatchWall off
     // while the TV keeps its own home screen for its feeds brings the switch back; keeping it on
     // while its feeds are off takes it away.
-    val switchPlanned = kept == null && summary.homeScreenPossible && state.plan.sections.isNotEmpty()
+    val switchPlanned = kept == null && !extras.helperOn && summary.homeScreenPossible && state.plan.sections.isNotEmpty()
     fun snackText(row: RowSummary): String {
         val patchWall = row.pkg == extras.patchWall
         val pattern = when {
@@ -584,8 +604,8 @@ internal fun WhyContent(state: SetupState.Found, extras: SetupExtras = SetupExtr
     state.plan.summary.groups.flatMap { g -> g.rows.filter { it.kept() } }.forEach { r ->
         Text(r.friendlyName, Modifier.padding(top = 16.dp), color = CytTheme.colors.textPrimary, style = CytTheme.type.titleMedium)
         val why = when (extras.homeRoles[r.pkg]) {
-            HomeRole.WIZARD -> stringResource(if (kept != null) R.string.customise_wizard_kept else R.string.customise_switch_part)
-            HomeRole.OWN_HOME -> stringResource(if (kept != null) R.string.customise_own_home_kept else R.string.customise_switch_part)
+            HomeRole.WIZARD -> stringResource(when { extras.helperOn -> R.string.customise_wizard_helper; kept != null -> R.string.customise_wizard_kept; else -> R.string.customise_switch_part })
+            HomeRole.OWN_HOME -> stringResource(when { extras.helperOn -> R.string.customise_own_home_helper; kept != null -> R.string.customise_own_home_kept; else -> R.string.customise_switch_part })
             null -> r.whyProtected ?: r.description
         }
         Body(why, Modifier.padding(top = 4.dp))
@@ -860,6 +880,8 @@ fun DoneScreen(state: SetupState.Done, extras: SetupExtras, actions: SetupAction
                 extras.unknownModel -> R.string.done_body_nothing_unknown
                 else -> R.string.done_body_nothing
             })
+            // RFC-HELPER-1 (test build): the helper's redirect, never "New home screen on" as for the switch.
+            extras.helperOn && extras.doneHomeKept == null -> msg(R.string.done_body_helper, "count" to s.switchedOff)
             s.homeScreenOn -> msg(R.string.done_body, "count" to s.switchedOff)
             blocked != null -> msg(R.string.done_body_home_kept, "count" to s.switchedOff)
             else -> msg(R.string.done_body_no_home, "count" to s.switchedOff)
@@ -945,7 +967,11 @@ private fun RestartCard(state: SetupState.Done, extras: SetupExtras, actions: Se
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     // UX finding 7: "the new one" only when it is; after a block or a failed switch
                     // the home screen is the TV's own.
-                    CheckLine(stringResource(if (state.summary.homeScreenOn || extras.homeKept == null) R.string.restart_progress_home else R.string.restart_progress_home_own))
+                    CheckLine(stringResource(when {
+                        extras.helperOn && extras.doneHomeKept == null -> R.string.restart_progress_home_helper
+                        state.summary.homeScreenOn || extras.homeKept == null -> R.string.restart_progress_home
+                        else -> R.string.restart_progress_home_own
+                    }))
                     if (extras.restartReenabled > 0) CheckLine(msg(R.string.restart_came_back, "count" to extras.restartReenabled))
                     CheckLine(stringResource(R.string.restart_progress_good))
                 }

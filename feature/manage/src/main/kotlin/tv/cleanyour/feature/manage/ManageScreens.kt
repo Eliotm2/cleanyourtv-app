@@ -166,6 +166,7 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
                 ListRow(stringResource(R.string.manage_row_home),
                     subtitle = when {
                         tv.stockHomeBack -> stringResource(R.string.manage_row_home_stock_back)
+                        tv.homeHelperOn -> stringResource(R.string.manage_row_home_helper)   // RFC-HELPER-1 (test build)
                         tv.ownHome -> stringResource(R.string.manage_row_home_own)
                         tv.homeInstalledNotInUse -> stringResource(R.string.manage_row_home_not_in_use)
                         else -> tv.dockNames.joinToString(", ").ifEmpty { null }

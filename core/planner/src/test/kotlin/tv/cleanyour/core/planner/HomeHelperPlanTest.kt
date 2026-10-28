@@ -51,6 +51,22 @@ class HomeHelperPlanTest {
     private fun refusedWith(r: PlanResult): List<String> = assertIs<PlanResult.Refused>(r, r.toString()).reasons
     private fun helperOps(p: Plan) = p.steps.filter { it.group == DefaultPlanner.GROUP_HELPER }.map { it.op }
 
+    // 0.4.7 (RFC-THEME-1): the helper's look (stock_home_redirect and key_filter in its config.json) goes the way any
+    // look goes: through the launcher's ThemeProvider on Android 10 and later with a launcher that has it, else the sync
+    // push; the helper's section follows it either way.
+    @Test fun theHelpersLookTakesTheProviderRouteWhereTheLookDoes() {
+        fun sdk(s: Snapshot, sdk: Int): Snapshot = s.copy(facts = s.facts.copy(sdk = sdk)).let { it.copy(contentHash = SnapshotCodec.hash(it)) }
+        val req = helperSetup().copy(launcher = PlannerFixtures.artifact().copy(versionCode = 9))
+        for ((v, route) in listOf(30 to tv.cleanyour.core.model.FileRoute.THEME_PROVIDER, 34 to tv.cleanyour.core.model.FileRoute.THEME_PROVIDER, 28 to tv.cleanyour.core.model.FileRoute.SYNC)) {
+            val p = ok(planner().plan(req, sdk(snapshot(), v), facts, emptyList()))
+            val push = p.steps.single { it.group == DefaultPlanner.GROUP_THEME && it.op is Op.PushAsset }
+            assertEquals(route, (push.op as Op.PushAsset).route, "SDK $v")
+            assertEquals(config, (push.op as Op.PushAsset).src, "the bytes with the helper's keys")
+            assertTrue(push.index < p.steps.first { it.group == DefaultPlanner.GROUP_HELPER }.index)
+            assertEquals(DefaultPlanner.SECTION_HELPER, p.sections.single().name)
+        }
+    }
+
     @Test fun theHelperKeepsTheTvsHomeAndAddsOnlyOurService() {
         val p = ok(planner().plan(helperSetup(), snapshot(), facts, emptyList()))
         // No home screen switch: HOME, the stock launcher and the wizard are left alone.

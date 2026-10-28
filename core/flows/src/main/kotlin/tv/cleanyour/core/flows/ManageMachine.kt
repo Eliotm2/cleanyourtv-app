@@ -9,6 +9,7 @@ import tv.cleanyour.core.engine.RunState
 import tv.cleanyour.core.model.DebugState
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.TvId
+import tv.cleanyour.core.planner.HomeHelper
 import tv.cleanyour.core.planner.PutBackAdvice
 import tv.cleanyour.core.spec.DockLayers
 
@@ -45,6 +46,9 @@ data class TvCard(
     // 0.4.7: on this connect the TV's own home screen, which this phone switched off, claims Home again
     // (StockHomeBack: XGIMI's remote buttons switch launcherx back on).
     val stockHomeBack: Boolean = false,
+    // RFC-HELPER-1 (test build): the Home button helper is on (HomeHelper.State.ON in the latest
+    // snapshot): the TV's own home screen stays Home and the Home button opens the new one.
+    val homeHelperOn: Boolean = false,
 )
 
 data class ManageState(
@@ -127,6 +131,7 @@ class ManageMachine(
                         homeInstalledNotInUse = notInUse,
                         reportSentAtMs = if (tv.profileId == null) attempt { d.sentReports.load(tv.id) }.getOrNull()?.atMs else null,
                         stockHomeBack = d.stockHomeBacks[tv.id],
+                        homeHelperOn = d.homeHelper && latest != null && HomeHelper.state(latest) == HomeHelper.State.ON,
                     )
                 }
                 send(Loaded(cards))

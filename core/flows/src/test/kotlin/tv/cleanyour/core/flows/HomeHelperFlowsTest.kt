@@ -95,6 +95,17 @@ class HomeHelperFlowsTest {
         assertTrue(PlanRequest.HomeHelperOff in h.planner.requests, h.planner.requests.toString())
     }
 
+    // 0.4.7: with the helper chosen the plan is a redirect, so no screen says the TV keeps its own home screen;
+    // a helper that did not hold is this run's news, as for the switch.
+    @Test fun theHelperIsNotAKeptHomeScreen() {
+        val casting = SetupExtras(homePossible = false, homeBlock = HomeBlock.CASTING)
+        assertEquals(HomeKept.Blocked(HomeBlock.CASTING), HomeKept.of(casting))
+        assertNull(HomeKept.of(casting.copy(helperOffer = true, helperOn = true)))
+        assertNull(HomeKept.of(SetupExtras(homePossible = false, homeBlock = HomeBlock.NONE, helperOn = true)))
+        assertEquals(HomeKept.SwitchFailed(tv.cleanyour.core.engine.HomeOutcome.TIMED_OUT),
+            HomeKept.of(casting.copy(helperOn = true, doneHomeKept = tv.cleanyour.core.engine.HomeOutcome.TIMED_OUT)))
+    }
+
     @Test fun theCardSaysWhatTheTvShows() {
         val base = Samples.miTvSnapshot()
         assertEquals(HelperShown.OFF_BY_TV, HomeHelperFlows.card(base.helper(service, "0", redirectOverlay), true)?.shown)
@@ -116,6 +127,21 @@ class HomeHelperFlowsTest {
         assertEquals(KnownLaunchers.TVLAUNCHER.pkg, HomeHelperKeys.redirectOf(doc))
         assertEquals(false, HomeHelperKeys.keyFilterOf(doc))
         h.snapshots.save(Samples.miTvSnapshot().helper(reader, "1", redirectOverlay, at = Samples.NOW_MS + 20))
+        assertNull(HomeHelperKeys.redirectOf(HomeHelperFlows.carry(h.manageDeps(), tv.id)(LauncherConfigDoc(columns = 6))))
+    }
+
+    // 0.4.7 (RFC-THEME-1): a TV whose launcher folder the shell cannot read (the look went through the provider)
+    // gives no overlay; with the helper listed, the TV's own Google home screen in charge is the redirect kept.
+    @Test fun aLookKeepsTheRedirectWhenTheOverlayCouldNotBeRead() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        val tv = h.knownTv()
+        val own = Samples.miTvSnapshot().helper(service, "1", null)
+        h.snapshots.save(own.copy(home = own.home.copy(resolved = KnownLaunchers.TVLAUNCHER)).let { it.copy(contentHash = SnapshotCodec.hash(it)) })
+        val doc = HomeHelperFlows.carry(h.manageDeps(), tv.id)(LauncherConfigDoc(columns = 6))
+        assertEquals(KnownLaunchers.TVLAUNCHER.pkg, HomeHelperKeys.redirectOf(doc))
+        assertEquals(false, HomeHelperKeys.keyFilterOf(doc))
+        // Not listed: nothing is added.
+        h.snapshots.save(Samples.miTvSnapshot().helper(reader, "1", null, at = Samples.NOW_MS + 20))
         assertNull(HomeHelperKeys.redirectOf(HomeHelperFlows.carry(h.manageDeps(), tv.id)(LauncherConfigDoc(columns = 6))))
     }
 

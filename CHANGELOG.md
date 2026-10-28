@@ -72,6 +72,13 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   people), the app reads the releases feed instead. When both fail, a problem report says why.
 - README: a "What your TV gets" section near the top, with the TV list page.
 
+### Test build only
+- The Home button helper (opt-in in Customise, with its consent): the TV's own home screen and its
+  setup wizard stay on, so casting keeps working, and the Home button opens the new home screen.
+  What we found, Customise, Done, Manage and the Home screen page say so instead of "the TV keeps
+  its own home screen", and the helper's Switch off replaces "Use the TV's own home screen". Its
+  look goes through the launcher's ThemeProvider where the look does.
+
 ## 0.4.6 (2026-10-28)
 
 ### Home screen

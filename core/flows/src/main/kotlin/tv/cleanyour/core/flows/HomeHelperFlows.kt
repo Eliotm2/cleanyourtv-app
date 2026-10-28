@@ -46,9 +46,18 @@ object HomeHelperFlows {
     // A look sent while our HomeKeyService is listed keeps the helper's two keys from the TV's
     // overlay (HomeHelperKeys.carry), so a new look never leaves the helper filtering keys with no
     // redirect. In every build: it keeps what the TV has, it never adds a key the TV did not have.
+    // 0.4.7 (RFC-THEME-1): where the look goes through the launcher's ThemeProvider the file is the
+    // launcher's, and a TV that locks the shell out of its folder gives the probe no overlay. With our
+    // service listed the TV's own home screen is still Home, so a Google one there is the redirect to
+    // keep; a look must never drop it only because the shell could not read the last one.
     suspend fun carry(d: ManageDeps, tvId: TvId): (LauncherConfigDoc) -> LauncherConfigDoc {
         val snap = attempt { d.snapshots.latest(tvId) }.getOrNull() ?: return { it }
         val listed = HomeHelper.listed(snap)
-        return { doc -> HomeHelperKeys.carry(doc, snap.launcherOverlay, listed) }
+        val unread = snap.launcherOverlay == null
+        val home = snap.home.resolved?.pkg?.takeIf { p -> KnownLaunchers.generic.any { it.pkg == p } }
+        return { doc ->
+            if (listed && unread && home != null && HomeHelperKeys.REDIRECT !in doc.unknown) HomeHelperKeys.with(doc, home)
+            else HomeHelperKeys.carry(doc, snap.launcherOverlay, listed)
+        }
     }
 }

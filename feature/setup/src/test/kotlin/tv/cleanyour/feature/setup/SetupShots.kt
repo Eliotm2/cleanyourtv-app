@@ -439,6 +439,8 @@ object SetupShots {
         Shot("found_replaces_launcher") { Setup(found(fullPlan.copy(summary = fullPlan.summary.copy(replacesLauncher = true)))) },
         // Issue #275: a TCL Google TV, whose remote's gear, Netflix and YouTube buttons need Google TV's home.
         Shot("found_tcl_remote_keys") { Setup(found(), connected.copy(tvName = "TCL 55C755", tclRemoteKeys = true)) },
+        // RFC-HELPER-1 (test build): the Home button helper chosen on a casting TV: the redirect's outcome, never "keeps its own".
+        Shot("found_helper") { Setup(found(), connected.copy(tvName = "Google TV Streamer", brand = "Google", homePossible = false, homeBlock = HomeBlock.CASTING, helperOffer = true, helperOn = true)) },
 
         // S3a Customise: Simple with the other groups collapsed; Custom with every group open, the
         // package names and the undo snackbar; the "Why?" sheet
@@ -485,9 +487,10 @@ object SetupShots {
         },
         Shot("customise_why_sheet_kept") { SheetFrame({ Setup(found(keptPlan), keptExtras) }, maxHeight = 420.dp) { WhyContent(found(keptPlan), keptExtras) } },
         // RFC-HELPER-1 (test build): Customise's Home button helper, switched on, and its consent.
-        Shot("customise_sheet_helper") {
-            SheetFrame({ Setup(found(homeSwitchOnlyPlan)) }) {
-                CustomiseContent(found(homeSwitchOnlyPlan), customising.copy(dock = emptyList(), helperOffer = true, helperOn = true),
+        // 0.4.7: a plan of switch-offs and the look only (the helper plan has no "Needed for the new home screen" group and no set-home-activity).
+        Shot("customise_sheet_helper", 1300.dp) {
+            SheetFrame({ Setup(found()) }, maxHeight = 1280.dp) {
+                CustomiseContent(found(), customising.copy(commands = commands.dropLast(1), helperOffer = true, helperOn = true),
                     NoSetupActions, rememberUndoSnackbarState(), {}, {}, initiallyOpen = emptyList())
             }
         },
@@ -658,6 +661,9 @@ object SetupShots {
         },
         // UX finding 18: the switch held but the look did not reach the TV.
         Shot("done_look_failed") { Setup(done(), connected.copy(doneLookFailed = true)) },
+        // RFC-HELPER-1 (test build): Done after the Home button helper, and after a restart.
+        Shot("done_helper") { Setup(done(), connected.copy(homePossible = false, homeBlock = HomeBlock.CASTING, helperOn = true)) },
+        Shot("done_helper_back_after_restart") { Setup(done(restart = RestartState.Back(72_000)), connected.copy(homePossible = false, homeBlock = HomeBlock.CASTING, helperOn = true)) },
         Shot("done_skipped_one") { Setup(done(off = 22, skipped = listOf("Play Games"))) },
         Shot("done_skipped_many") { Setup(done(off = 20, skipped = listOf("Play Games", "Mi Cast", "Mi Home"))) },
         // Issue #15: nothing to switch off and no home switch, on a TV we know and on one we don't.

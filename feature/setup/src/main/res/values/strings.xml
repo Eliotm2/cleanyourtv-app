@@ -95,6 +95,9 @@
          the Why sheet. Every long reason ends with the same sentence. -->
     <string name="fire_tv_name" translatable="false">Fire TV</string>
     <string name="kept_outcome">The TV keeps its own home screen.</string>
+    <!-- RFC-HELPER-1 (test build): the outcome with the Home button helper, on What we found, Customise and Done -->
+    <string name="helper_outcome">The Home button opens the new home screen.</string>
+    <string name="helper_outcome_body">The TV\'s own stays on, so casting keeps working.</string>
     <string name="kept_outcome_short">Home screen: the TV\'s own</string>
     <string name="kept_why">Why</string>
     <string name="kept_why_title">Why the TV keeps its own home screen</string>
@@ -164,6 +167,8 @@
     <string name="customise_own_home_off">The TV\'s own home screen. Switched off only after the new one works.</string>
     <string name="customise_switch_part">Part of the home screen switch; it comes back on if the switch is undone.</string>
     <string name="customise_wizard_kept">Stays on. This TV keeps its own home screen, and its setup wizard stays with it.</string>
+    <string name="customise_wizard_helper">Stays on. The Home button helper works with the TV\'s own home screen and its setup wizard.</string>
+    <string name="customise_own_home_helper">The TV\'s own home screen. It stays on, and the Home button opens the new one.</string>
     <string name="customise_own_home_kept">The TV\'s own home screen. It stays, because this TV keeps it.</string>
     <string name="customise_protected_title">We keep these</string>
     <string name="customise_protected_pill">Protected</string>
@@ -344,6 +349,7 @@
     <string name="done_body_nothing_unknown">We weren\'t sure about anything on this TV, so it\'s just as it was. Help add this TV, and a later version can do more.</string>
     <string name="done_hero_cd">A clean home screen with a glass check mark</string>
     <string name="done_body">{count, plural, =0 {New home screen on. Everything can be put back.} one {# thing switched off. New home screen on. Everything can be put back.} other {# things switched off. New home screen on. Everything can be put back.}}</string>
+    <string name="done_body_helper">{count, plural, =0 {The Home button opens the new home screen. The TV\'s own stays on, so casting keeps working. Everything can be put back.} one {# thing switched off. The Home button opens the new home screen. The TV\'s own stays on, so casting keeps working. Everything can be put back.} other {# things switched off. The Home button opens the new home screen. The TV\'s own stays on, so casting keeps working. Everything can be put back.}}</string>
     <string name="done_body_no_home">{count, plural, one {# thing switched off. Everything can be put back.} other {# things switched off. Everything can be put back.}}</string>
     <!-- 0.4.7 (UX finding 6, PM 4): the lead on a TV that keeps its own home screen by Setup's decision -->
     <string name="done_body_home_kept">{count, plural, =0 {The TV keeps its own home screen, so it will look the same. Everything can be put back.} one {# thing switched off. The TV keeps its own home screen, so it will look the same. Everything can be put back.} other {# things switched off. The TV keeps its own home screen, so it will look the same. Everything can be put back.}}</string>
@@ -384,6 +390,7 @@
     <string name="restart_progress_found">Found it at {time}...</string>
     <string name="restart_progress_home">Home screen is the new one.</string>
     <!-- 0.4.7 (UX finding 7): the TV keeps its own home screen, by Setup's decision or after a failed switch -->
+    <string name="restart_progress_home_helper">The Home button opens the new home screen.</string>
     <string name="restart_progress_home_own">Home screen is the TV\'s own, as before.</string>
     <string name="restart_progress_good">All good.</string>
     <string name="restart_came_back">{count, plural, one {# thing came back on after the restart; switched off again.} other {# things came back on after the restart; switched off again.}}</string>
@@ -419,7 +426,7 @@
     <string name="helper_group">Home button</string>
     <string name="helper_row">Home button helper</string>
     <string name="helper_row_note">Keep the TV\'s own home screen and send the Home button to the new one</string>
-    <string name="helper_row_on">On: the TV keeps its home screen, the Home button opens the new one</string>
+    <string name="helper_row_on">On: the Home button opens the new home screen, and the TV\'s own stays on</string>
     <string name="helper_consent_title">Home button helper</string>
     <string name="helper_consent_keep">Your TV keeps its own home screen, and its setup wizard stays on, so casting and your Wi-Fi are not touched. A small helper inside the new home screen watches for the TV\'s home screen and opens the new one instead.</string>
     <string name="helper_consent_sees">The helper is an Android accessibility service. Android will say it can see your screen and the buttons you press. This one asks Android only for which app is open, not for what is on screen, and not for your button presses. It has no internet access. It is part of the open-source home screen by Gathin (github.com/Gathin23/cleanyourtv), the same app this app installs.</string>

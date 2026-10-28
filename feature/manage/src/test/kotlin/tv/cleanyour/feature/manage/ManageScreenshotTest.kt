@@ -213,6 +213,8 @@ object ManageShots {
         Shot("manage_wizard_home_working", tall) { ManageScreen(manage(card().copy(wizardHome = true)).copy(switchingHome = true), {}) },
         // 0.4.7 (StockHomeBack): the TV turned its own home screen back on (XGIMI's remote buttons); Run Setup again leads.
         Shot("manage_stock_home_back", tall) { ManageScreen(manage(card().copy(stockHomeBack = true)), {}) },
+        // RFC-HELPER-1 (test build): the Home button helper is on; the Home screen row says so.
+        Shot("manage_home_helper", tall) { ManageScreen(manage(card().copy(homeHelperOn = true)), {}) },
         Shot("manage_two_tvs", tall) {
             val other = card().copy(id = TvId("1111222233334444"), name = "Bedroom Chromecast", room = "Bedroom")
             ManageScreen(manage(others = listOf(other)), {})
