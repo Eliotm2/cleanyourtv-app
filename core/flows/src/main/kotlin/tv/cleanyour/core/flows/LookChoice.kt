@@ -182,6 +182,27 @@ data class LookDraft(
     val offeredExtras: LookExtras = LookExtras.DEFAULT,
 )
 
+// 0.4.7: what Customise names the look step's choice by. Before, the row read only the 0.4.0 theme id, so a look
+// with the person's own photo said "Look: Default". Legacy: a 0.4.0 look by its theme id (null: Default, also the
+// Default look of look2, Classic with no picture). Styled: a look2 choice, with the person's photo or a gallery
+// picture (`picture`, its id) or neither.
+sealed interface LookName {
+    data class Legacy(val themeId: String?) : LookName
+    data class Styled(val style: StyleId, val photo: Boolean = false, val picture: String? = null) : LookName
+
+    companion object {
+        fun of(look: LookDraft?, draftThemeId: String?): LookName {
+            if (look == null) return Legacy(draftThemeId)
+            look.legacyThemeId?.let { return Legacy(it) }
+            return when (val pic = look.picture) {
+                LookPicture.MINE_ID, LookPicture.NEW_ID, LookPicture.EARLIER_ID -> Styled(look.style, photo = true)
+                null, LookPicture.NONE_ID -> if (look.style == StyleId.CLASSIC) Legacy(null) else Styled(look.style)
+                else -> Styled(look.style, picture = pic)
+            }
+        }
+    }
+}
+
 // The parts of a choice the rules read, from a draft or a saved choice: every value concrete.
 // `picture` is a picture id as LookDraft.picture holds it.
 internal data class LookParts(

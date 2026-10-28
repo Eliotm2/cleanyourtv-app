@@ -14,6 +14,8 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   its saved address does not answer, the app looks for it on the network, checks it is the same
   TV with the key it already allowed, and saves the new address. No other TV is connected, and
   none shows an Allow prompt.
+- Setup's Customise names the look you picked ("Classic with your photo", "Glass with Mist")
+  instead of "Look: Default".
 
 ## 0.4.6 (2026-10-28)
 

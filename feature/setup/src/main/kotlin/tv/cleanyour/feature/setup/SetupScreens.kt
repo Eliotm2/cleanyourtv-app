@@ -47,6 +47,7 @@ import tv.cleanyour.core.flows.ChipState
 import tv.cleanyour.core.flows.Confirmations
 import tv.cleanyour.core.flows.Finishing
 import tv.cleanyour.core.flows.HomeBlock
+import tv.cleanyour.core.flows.LookName
 import tv.cleanyour.core.flows.NothingWhy
 import tv.cleanyour.core.flows.Reconnect
 import tv.cleanyour.core.flows.RestartState
@@ -111,7 +112,9 @@ import tv.cleanyour.ui.design.component.TvStatusChip
 import tv.cleanyour.ui.design.component.TvThumbnail
 import tv.cleanyour.ui.design.component.UndoSnackbarHost
 import tv.cleanyour.ui.design.component.UndoSnackbarState
+import tv.cleanyour.ui.design.component.galleryPictureName
 import tv.cleanyour.ui.design.component.rememberEmphasis
+import tv.cleanyour.ui.design.component.styleName
 import tv.cleanyour.ui.design.component.rememberUndoSnackbarState
 import tv.cleanyour.ui.design.component.LookDoneFooter
 import tv.cleanyour.ui.design.component.LookEditor
@@ -380,7 +383,7 @@ internal fun ColumnScope.CustomiseContent(
         ListRow(dockRow, onClick = { actions.intent(SetupIntent.Open(Sheet.DOCK)) })
         ListDivider()
         // The look, and its apps in a row when it is not the look's own ("Look: Console, 6 apps in a row").
-        val theme = extras.themes.firstOrNull { it.id == extras.draft?.themeId }?.name ?: stringResource(R.string.theme_default)
+        val theme = lookName(extras)
         val count = extras.look?.takeIf { it.columns != it.lookColumns }?.columns
         ListRow(if (count != null) msg(R.string.customise_look_row_count, "theme" to theme, "count" to count) else msg(R.string.customise_look_row, "theme" to theme),
             onClick = { actions.intent(SetupIntent.Open(Sheet.THEME)) })
@@ -463,6 +466,20 @@ internal fun DockContent(state: DockEditorState, apps: List<AppChoice>, onDone: 
 }
 
 internal fun AppChoice.toDockApp() = DockApp(pkg.value, name)
+
+// Customise's look name. 0.4.7: a look2 choice names its style and picture ("Classic with your photo"); the row read
+// only the 0.4.0 theme id before, so a look with the person's own photo said "Look: Default". A 0.4.0 look keeps its
+// name, and the Default look (Classic, no picture) stays "Default".
+@Composable
+private fun lookName(extras: SetupExtras): String = when (val n = LookName.of(extras.look, extras.draft?.themeId)) {
+    is LookName.Legacy -> extras.themes.firstOrNull { it.id == n.themeId }?.name ?: stringResource(R.string.theme_default)
+    is LookName.Styled -> when {
+        n.photo -> msg(R.string.customise_look_photo, "style" to styleName(n.style))
+        n.picture != null -> extras.pictures.firstOrNull { it.id == n.picture }
+            ?.let { msg(R.string.customise_look_picture, "style" to styleName(n.style), "picture" to galleryPictureName(it.id, it.name)) } ?: styleName(n.style)
+        else -> styleName(n.style)
+    }
+}
 
 // The look step (S3a "Look: Default >"): the Look editor of :ui:design, the same pages in the same
 // order as the Look sheet after Setup (Picture, Style, Apps in a row, Names under every app, More
