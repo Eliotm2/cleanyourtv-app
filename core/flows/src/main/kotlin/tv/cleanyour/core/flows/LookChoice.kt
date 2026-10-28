@@ -183,7 +183,8 @@ data class LookDraft(
 )
 
 // 0.4.7: what Customise names the look step's choice by. Before, the row read only the 0.4.0 theme id, so a look
-// with the person's own photo said "Look: Default". Legacy: a 0.4.0 look by its theme id (null: Default, also the
+// with the person's own photo said "Look: Default". Legacy: a 0.4.0 look by its theme id, the wizard draft's or the
+// look's (null: Default, also the
 // Default look of look2, Classic with no picture). Styled: a look2 choice, with the person's photo or a gallery
 // picture (`picture`, its id) or neither.
 sealed interface LookName {
@@ -192,7 +193,8 @@ sealed interface LookName {
 
     companion object {
         fun of(look: LookDraft?, draftThemeId: String?): LookName {
-            if (look == null) return Legacy(draftThemeId)
+            // A 0.4.0 look the wizard draft names keeps its name, as before; a look2 choice leaves the draft's id empty.
+            if (look == null || draftThemeId != null) return Legacy(draftThemeId)
             look.legacyThemeId?.let { return Legacy(it) }
             return when (val pic = look.picture) {
                 LookPicture.MINE_ID, LookPicture.NEW_ID, LookPicture.EARLIER_ID -> Styled(look.style, photo = true)

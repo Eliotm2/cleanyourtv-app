@@ -62,7 +62,7 @@ class TvAccess(
     private val clock: Clock,
     private val pollMs: Long = 2_000,
     private val giveUpMs: Long = 10 * 60_000,
-    private val searchMs: Long = 8_000,
+    private val searchMs: Long = 15_000,
     private val searchEveryMs: Long = 30_000,
     private val log: FlowLog = FlowLog { },
 ) {

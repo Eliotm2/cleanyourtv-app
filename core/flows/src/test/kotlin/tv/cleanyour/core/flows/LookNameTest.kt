@@ -17,7 +17,7 @@ class LookNameTest {
         assertEquals(LookName.Styled(StyleId.SPOTLIGHT), LookName.of(draft(LookPicture.NONE_ID, StyleId.SPOTLIGHT), null))
         // The Default look stays "Default", and a 0.4.0 look keeps its name.
         assertEquals(LookName.Legacy(null), LookName.of(draft(LookPicture.NONE_ID), null))
-        assertEquals(LookName.Legacy(null), LookName.of(draft(null), "aurora"))
+        assertEquals(LookName.Legacy("aurora"), LookName.of(draft("mist"), "aurora"))
         assertEquals(LookName.Legacy("aurora"), LookName.of(draft("mist", legacy = "aurora"), null))
         assertEquals(LookName.Legacy("aurora"), LookName.of(null, "aurora"))
     }
