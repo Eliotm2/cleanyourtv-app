@@ -16,6 +16,9 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   none shows an Allow prompt.
 - Setup's Customise names the look you picked ("Classic with your photo", "Glass with Mist")
   instead of "Look: Default".
+- "Check for updates" works on more phones: when GitHub's API turns the phone away (it allows
+  60 checks an hour per network address, which a mobile network or a VPN shares with many
+  people), the app reads the releases feed instead. When both fail, a problem report says why.
 
 ## 0.4.6 (2026-10-28)
 
