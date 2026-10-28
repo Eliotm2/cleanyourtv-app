@@ -1099,16 +1099,25 @@ class ManageMachinesTest {
         }
         h.journal.append(JournalRecord.End(plan.id, RunStatus.COMPLETED))
         h.prober.home = HomeResolution(stock, listOf(HomeClaimant(stock, 2), HomeClaimant(Launcher.home, 0)))
-        val m = ManageMachine(h.manageDeps(), backgroundScope, tv.id)
+        val d = h.manageDeps()
+        val m = ManageMachine(d, backgroundScope, tv.id)
         settle()
         assertTrue(assertNotNull(m.state.value.current).stockHomeBack)
         assertFalse(assertNotNull(m.state.value.current).wizardHome)
         assertEquals(listOf("manage: the TV's own home screen is on again after this app switched it off, and Home answers to it"),
             h.logLines.filter { it.startsWith("manage:") })
+        // A problem report says so in its Home screen lines, which are never cut.
+        val input = assertNotNull(ProblemReports.input(d, tv.id))
+        assertTrue(input.stockHomeBack)
+        assertTrue(TvReport.text(input).lines().contains("Since then: the TV's own home screen, switched off by this app, is on again and claims Home"))
+        // Read again with the same answer: one log line, not one per connect.
+        m.dispatch(ManageIntent.Select(tv.id)); settle()
+        assertEquals(1, h.logLines.count { it.startsWith("manage:") })
         // Off again (or put back by the person through this app): nothing to say.
         h.prober.home = HomeResolution(Launcher.home, listOf(HomeClaimant(Launcher.home, 0)))
         m.dispatch(ManageIntent.Select(tv.id)); settle()
         assertFalse(assertNotNull(m.state.value.current).stockHomeBack)
+        assertFalse(assertNotNull(ProblemReports.input(d, tv.id)).stockHomeBack)
         assertFalse(StockHomeBack.applies(HomeResolution(stock, listOf(HomeClaimant(stock, 2))), emptyList(), stock), "never switched off by this app")
     }
 

@@ -126,6 +126,9 @@ data class TvReportInput(
     val switchedOffByApp: Set<PackageName> = emptySet(),
     // beta3: the home decision is an earlier Setup's (HomeDecision.earlier), so the line says so.
     val homeEarlier: Boolean = false,
+    // 0.4.7: Manage's last connect found the TV's own home screen, which this app switched off, claiming Home again
+    // (StockHomeBack: XGIMI's remote buttons switch launcherx back on).
+    val stockHomeBack: Boolean = false,
 )
 
 object TvReport {
@@ -229,6 +232,7 @@ object TvReport {
         )
         if (claimants.isEmpty()) appendLine("Claimants: none")
         for (c in claimants) appendLine("Claimant: ${named(s, c.component)} priority ${c.priority}")
+        if (input.stockHomeBack) appendLine("Since then: the TV's own home screen, switched off by this app, is on again and claims Home")
         val system = s.packages.filter { it.value.system }.toSortedMap(compareBy { it.value })
         val others = s.packages.size - system.size
         appendLine()

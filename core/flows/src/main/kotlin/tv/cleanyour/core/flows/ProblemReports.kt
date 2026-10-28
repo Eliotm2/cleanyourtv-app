@@ -232,6 +232,7 @@ object ProblemReports {
             about = d.about, snapshot = snap, profile = profile, home = home,
             switchedOffByApp = attempt { d.ledger.switchedOffByUs(tv.id).toSet() }.getOrDefault(emptySet()),
             homeEarlier = home?.earlier(d.about.version, profile) == true,
+            stockHomeBack = d.stockHomeBacks[tv.id],
         )
     }
 

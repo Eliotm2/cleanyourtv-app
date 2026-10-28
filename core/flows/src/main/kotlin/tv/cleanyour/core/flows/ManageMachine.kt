@@ -90,7 +90,6 @@ class ManageMachine(
     private data class SwitchingHome(val on: Boolean)
     // 0.4.6: what the last connect read of each TV's Home said (WizardHome), for the cards.
     private val wizardHomes = java.util.concurrent.ConcurrentHashMap<TvId, Boolean>()
-    private val stockBacks = java.util.concurrent.ConcurrentHashMap<TvId, Boolean>()   // 0.4.7 (StockHomeBack)
 
     init {
         scope.launch {
@@ -127,7 +126,7 @@ class ManageMachine(
                         wizardHome = wizardHomes[tv.id] == true,
                         homeInstalledNotInUse = notInUse,
                         reportSentAtMs = if (tv.profileId == null) attempt { d.sentReports.load(tv.id) }.getOrNull()?.atMs else null,
-                        stockHomeBack = stockBacks[tv.id] == true,
+                        stockHomeBack = d.stockHomeBacks[tv.id],
                     )
                 }
                 send(Loaded(cards))
@@ -153,9 +152,8 @@ class ManageMachine(
         val applies = WizardHome.applies(home, attempt { d.snapshots.latest(id) }.getOrNull(), profile, stock)
         val back = StockHomeBack.applies(home, changes, stock)
         wizardHomes[id] = applies
-        if (back && stockBacks[id] != true) d.log.line("manage: the TV's own home screen is on again after this app switched it off, " +
+        if (d.stockHomeBacks.record(id, back)) d.log.line("manage: the TV's own home screen is on again after this app switched it off, " +
             if (home.resolved?.pkg == stock?.pkg) "and Home answers to it" else "Home answers to ${if (home.resolved?.pkg == Launcher.pkg) "ours" else "another"}")
-        stockBacks[id] = back
         send(WizardHomeRead(id, applies, back))
     }
 

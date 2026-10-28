@@ -41,6 +41,14 @@ object WizardHome {
 // package is our Disable), claims Home again; the card says so (TvCard.stockHomeBack) and the log has a line.
 // Nothing is switched here: the Home button helper is the fix for such TVs.
 object StockHomeBack {
+    // What Manage's last connect read for each TV, one per graph (ManageDeps), so a problem report has the line too.
+    class Reads {
+        private val back = java.util.concurrent.ConcurrentHashMap<tv.cleanyour.core.model.TvId, Boolean>()
+        operator fun get(id: tv.cleanyour.core.model.TvId): Boolean = back[id] == true
+        // Records this read; true when it says "back" and the read before did not.
+        fun record(id: tv.cleanyour.core.model.TvId, applies: Boolean): Boolean = back.put(id, applies) != true && applies
+    }
+
     fun applies(home: HomeResolution, changes: List<ChangeRecord>, stock: Component?): Boolean {
         if (stock == null) return false
         val target = UndoOrder.Target.PackageEnabled(stock.pkg)

@@ -133,7 +133,8 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
             )
             // Navigation into the wizard, whose own "Make it clean" is the guarded action (R5-W8 O1).
             // 0.4.7 (PM 11): "Run Setup again" stays visible for every TV, the one name for the way back in.
-            if (!tv.clean) PrimaryButton(stringResource(R.string.manage_clean_again), { onIntent(ManageIntent.CleanAgain) }, Modifier.padding(top = 16.dp), guardObscured = false)
+            // 0.4.7 (StockHomeBack): the TV turned its own home screen back on, so Run Setup again is the way back.
+            if (!tv.clean || tv.stockHomeBack) PrimaryButton(stringResource(R.string.manage_clean_again), { onIntent(ManageIntent.CleanAgain) }, Modifier.padding(top = 16.dp), guardObscured = false)
             else SecondaryButton(stringResource(R.string.manage_clean_again), { onIntent(ManageIntent.CleanAgain) }, Modifier.padding(top = 16.dp))
             // 0.3.2 B1: an unlisted TV (no exact profile) invites the person to help add it.
             // 0.4.7 (must 4): once its report was sent, the banner says when and that the issue is
@@ -160,9 +161,11 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
             }
             ListGroup(Modifier.padding(top = 16.dp)) {
                 // 0.3.3 D2: without the new home screen there is no dock to name; the row opens the reason.
-                // 0.4.7 (UX finding 8): installed but not in use says the TV's own is in use.
+                // 0.4.7 (UX finding 8): installed but not in use says the TV's own is in use; and when the
+                // TV turned its own back on behind this app (StockHomeBack), the row says that.
                 ListRow(stringResource(R.string.manage_row_home),
                     subtitle = when {
+                        tv.stockHomeBack -> stringResource(R.string.manage_row_home_stock_back)
                         tv.ownHome -> stringResource(R.string.manage_row_home_own)
                         tv.homeInstalledNotInUse -> stringResource(R.string.manage_row_home_not_in_use)
                         else -> tv.dockNames.joinToString(", ").ifEmpty { null }

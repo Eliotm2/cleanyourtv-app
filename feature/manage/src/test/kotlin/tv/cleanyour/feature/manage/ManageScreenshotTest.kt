@@ -211,6 +211,8 @@ object ManageShots {
         // 0.4.6: a setup wizard claims Home under the new home screen; the way back, and while it runs.
         Shot("manage_wizard_home", tall) { ManageScreen(manage(card().copy(wizardHome = true)), {}) },
         Shot("manage_wizard_home_working", tall) { ManageScreen(manage(card().copy(wizardHome = true)).copy(switchingHome = true), {}) },
+        // 0.4.7 (StockHomeBack): the TV turned its own home screen back on (XGIMI's remote buttons); Run Setup again leads.
+        Shot("manage_stock_home_back", tall) { ManageScreen(manage(card().copy(stockHomeBack = true)), {}) },
         Shot("manage_two_tvs", tall) {
             val other = card().copy(id = TvId("1111222233334444"), name = "Bedroom Chromecast", room = "Bedroom")
             ManageScreen(manage(others = listOf(other)), {})

@@ -49,6 +49,9 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   its saved address does not answer, the app looks for it on the network, checks it is the same
   TV with the key it already allowed, and saves the new address. No other TV is connected, and
   none shows an Allow prompt.
+- When the TV turns its own home screen back on behind the app (the XGIMI MoGo 3 Pro does on some
+  remote buttons), Manage's Home screen row says so with "Run Setup again" first, and a problem
+  report has the line.
 
 ### Reports
 - "Help add this TV" remembers that this TV's report was sent and when, on the report screen, on

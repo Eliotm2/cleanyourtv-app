@@ -126,6 +126,8 @@ class ManageDeps(
     val redact: (String) -> String = { it },
     // 0.4.7: Manage's diagnostics lines (StockHomeBack); outcomes in fixed words.
     val log: FlowLog = FlowLog { },
+    // 0.4.7: what each TV's last connect read (StockHomeBack), for Manage's card and the problem report.
+    val stockHomeBacks: StockHomeBack.Reads = StockHomeBack.Reads(),
 ) {
     fun tv(id: TvId): Tv? = tvs.tvs.value.firstOrNull { it.id == id }
 
