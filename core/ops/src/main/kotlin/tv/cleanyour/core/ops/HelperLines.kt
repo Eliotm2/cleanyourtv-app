@@ -64,7 +64,7 @@ object HelperLines {
         check(RemoteDir.TMP.path == DIR) { "helper watchdog dir differs from RemoteDir.TMP" }
     }
 
-    // ---- list arithmetic (the phone side of the compare-and-set) ----------------------------------
+    // The list arithmetic: the phone side of the compare-and-set.
 
     fun entries(list: String?): List<String> = list?.takeIf { it.isNotEmpty() && it != "null" }?.split(':').orEmpty()
     // The component in its short or full class form (Android accepts and keeps either).
@@ -78,7 +78,7 @@ object HelperLines {
     fun appended(expected: String?, component: Component): String = (entries(expected) + component.flat).joinToString(":")
     fun without(expected: String?, component: Component = SERVICE): String? = others(expected, component).joinToString(":").ifEmpty { null }
 
-    // ---- the lines ---------------------------------------------------------------------------------
+    // The lines.
 
     fun add(expected: String?, component: Component): String {
         ours(component)

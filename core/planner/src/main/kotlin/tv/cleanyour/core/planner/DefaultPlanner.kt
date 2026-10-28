@@ -589,7 +589,7 @@ class DefaultPlanner(
             homeScreenPossible = true
         }
 
-        // ---- The Home button helper (RFC-HELPER-1, test build) ----------------------------------------
+        // The Home button helper (RFC-HELPER-1, test build).
 
         // PLAN 4.3: after the look (which carries stock_home_redirect and key_filter false, and whose
         // own restart put the TV's list back first, 4.5), one guarded section: the new home screen

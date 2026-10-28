@@ -31,7 +31,7 @@ class HelperLinesTest {
     private val input = "com.gathin.tvhome/com.gathin.tvhome.InputKeyService"
     private val token = RunToken("0123456789abcdef")
 
-    // ---- the TV's sh --------------------------------------------------------------------------------
+    // The TV's sh.
 
     private class Tv(list: String?, on: String?) {
         val dir: File = Files.createTempDirectory("cyt-helper").toFile()
@@ -136,7 +136,7 @@ class HelperLinesTest {
         assertEquals("$reader:${service.flat}", defused.list()); assertEquals(0, defused.homeStarts)
     }
 
-    // ---- the renderer ---------------------------------------------------------------------------------
+    // The renderer.
 
     @Test fun onlyOurServiceIsEverAddedOrRemovedAndNeverTwice() {
         val other = Component(PackageName("com.example.reader"), ".Reader")
