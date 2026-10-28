@@ -176,7 +176,7 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
                 // STORES-PLAN 1: the Play build has no add-ons, so no row that leads to them.
                 // UX finding 9: without the new home screen a card shows as an app, and the row says so.
                 if (state.addOns) {
-                    ListRow(stringResource(R.string.manage_row_cards), subtitle = if (tv.ownHome || tv.homeInstalledNotInUse) stringResource(R.string.manage_row_cards_own_home) else null,
+                    ListRow(stringResource(R.string.manage_row_cards), subtitle = if ((tv.ownHome || tv.homeInstalledNotInUse) && !tv.homeHelperOn) stringResource(R.string.manage_row_cards_own_home) else null,
                         onClick = { onIntent(ManageIntent.Open(ManageSection.MODULES)) })
                     ListDivider()
                 }

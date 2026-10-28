@@ -116,7 +116,8 @@ class ManageMachine(
                     // launcher under our name Setup left as it is (HOME_CHANGED): installed, not in use.
                     val mine = ours != null && tv.launcher == null && (ours.signer == null || pin == null || ours.signer == pin.signer)
                     val decision = if (mine) attempt { d.homeDecisions.load(tv.id) }.getOrNull() else null
-                    val notInUse = mine && latest?.home?.resolved?.pkg != Launcher.pkg && decision?.alreadyOn != true && decision?.block == null
+                    // RFC-HELPER-1: with our HomeKeyService listed the TV's own is Home on purpose; the new one is in use through it.
+                    val notInUse = mine && latest?.home?.resolved?.pkg != Launcher.pkg && decision?.alreadyOn != true && decision?.block == null && latest?.let { HomeHelper.listed(it) } != true
                     TvCard(
                         id = tv.id, name = tv.nickname, room = tv.room, clean = off > 0, checkedAtMs = tv.lastSeenAt, level = tv.level,
                         chip = chipFor(states[tv.id]?.takeIf { d.access.live(tv.id) != null }, run, tv.debugging),

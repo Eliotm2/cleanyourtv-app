@@ -14,8 +14,9 @@ import tv.cleanyour.core.planner.PlanRequest
 // as a SAF zip; "Before a factory reset" on Google TV.
 // `launcherInstalled` (0.4.7, UX finding 17): the new home screen is on the TV, so the preview asks
 // whether to keep or remove it; on a TV where Setup never installed it there is nothing to ask.
+// `helperOff` (RFC-HELPER-1, 0.4.7-beta1 QA): the undo takes our HomeKeyService out of the TV's list, so the sheet says so.
 data class UndoPreview(val plan: Plan, val thingsBack: Int, val stockName: String?, val wizardBack: Boolean, val removeLauncher: Boolean,
-                       val launcherInstalled: Boolean = true)
+                       val launcherInstalled: Boolean = true, val helperOff: Boolean = false)
 
 sealed interface RestorePhase {
     data object Idle : RestorePhase
@@ -107,7 +108,8 @@ class RestorePointMachine(
         val back = plan.steps.count { it.op is Op.Enable || it.op is Op.DefaultState }
         val wizard = wraith != null && plan.steps.any { (it.op as? Op.Enable)?.pkg == wraith }
         val installed = d.snapshots.latest(tvId)?.packages?.containsKey(Launcher.pkg) == true || tv?.launcher != null
-        send(Phase(RestorePhase.Preview(UndoPreview(plan, back, stock?.let { d.nameOf(it) }, wizard, removeLauncher, installed), confirming = false)))
+        val helper = plan.steps.any { it.op is Op.AccessibilityRemove }
+        send(Phase(RestorePhase.Preview(UndoPreview(plan, back, stock?.let { d.nameOf(it) }, wizard, removeLauncher, installed, helper), confirming = false)))
     }
 
     private suspend fun undoEverything(p: UndoPreview) {

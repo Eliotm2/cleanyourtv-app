@@ -11,6 +11,7 @@ import tv.cleanyour.core.model.PackageName
 import tv.cleanyour.core.model.TvId
 import tv.cleanyour.core.ops.HomePlaceholder
 import tv.cleanyour.core.planner.FireOs
+import tv.cleanyour.core.planner.HomeHelper
 import tv.cleanyour.core.planner.Plan
 import tv.cleanyour.core.planner.PlanRequest
 import tv.cleanyour.core.planner.TclGoogleTv
@@ -340,6 +341,9 @@ class HomeScreenMachine(
     // why, as for issue #8, instead of offering a dock and a look for it.
     private suspend fun notOnTv(tv: tv.cleanyour.core.model.Tv, snap: tv.cleanyour.core.model.Snapshot?): NotOnTv? {
         if (tv.launcher != null || snap == null) return null
+        // RFC-HELPER-1 (0.4.7-beta1 QA): with our HomeKeyService listed the TV's own home screen is Home on
+        // purpose and the new one is in use through the helper: the page shows the helper's card, Dock and Look.
+        if (HomeHelper.listed(snap)) return null
         val decision = attempt { d.homeDecisions.load(tvId) }.getOrNull()
         val reason = decision?.block?.let { b -> HomeBlock.entries.firstOrNull { it.name == b } }
         val brand = LogCodes.clean(snap.facts.brand, 40).ifEmpty { tv.nickname }
