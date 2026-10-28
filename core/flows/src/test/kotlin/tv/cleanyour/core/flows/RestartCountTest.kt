@@ -8,6 +8,8 @@ import tv.cleanyour.core.engine.HomeOutcome
 import tv.cleanyour.core.engine.JournalRecord
 import tv.cleanyour.core.engine.RunStatus
 import tv.cleanyour.core.model.BlobRef
+import tv.cleanyour.core.model.Component
+import tv.cleanyour.core.model.PackageName
 import tv.cleanyour.core.model.ConnectionState
 import tv.cleanyour.core.model.Endpoint
 import tv.cleanyour.core.model.FileRoute
@@ -285,6 +287,31 @@ class RestartCountTest {
         assertTrue(h.logLines.any { it.startsWith("manage: reconnected by itself after 1 try") })
         assertFalse(m.state.value.offline)
         assertTrue(h.access.reach.value is Reach.Idle, "no debugging step on the phone")
+    }
+
+    // The TV emulator answers the known-TV handshake half a minute before it is up, with Home still FallbackHome: that
+    // read counts nothing, and Manage reads Home again until the TV has its home screen, then counts the restart.
+    @Test fun aRestartSeenWhileTheTvStillBootsIsCountedOnceItIsUp() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        val tv = h.switchedTv()
+        h.prober.home = ours
+        h.discovery.open5555[HOST] = true
+        val m = ManageMachine(h.manageDeps(), backgroundScope, tv.id)
+        settle()
+        m.dispatch(ManageIntent.Resumed); settle()
+        h.sessions.closeAll()
+        h.session.setState(ConnectionState.Connected(Endpoint.PlainTcp(HOST), emptySet(), 4096))
+        h.prober.bootIdValue = "boot-2"
+        val fallback = Component(PackageName("com.android.tv.settings"), ".FallbackHome")
+        h.prober.home = HomeResolution(fallback, listOf(HomeClaimant(fallback, -1000)))
+        settle()
+        assertFalse(m.state.value.offline)
+        assertEquals(0, m.state.value.current?.restarts?.counted, "nothing counted while the TV boots")
+        h.prober.home = ours
+        settle(ManageMachine.SETTLE_EVERY_MS)
+        val r = assertNotNull(m.state.value.current?.restarts)
+        assertEquals(listOf(1, 0), listOf(r.held, r.failed))
+        assertFalse(Restarts.settled(HomeResolution(null, emptyList())))
     }
 
     @Test fun aTvThatNoLongerTakesTheKeyIsNotAskedAndManageKeepsTrying() = runTest(timeout = 30.seconds) {

@@ -1376,7 +1376,7 @@ class SetupMachine(
         val latest = attempt { deps.snapshots.latest(record.id) }.getOrNull()
         val decision = attempt { deps.homeDecisions?.load(record.id) }.getOrNull()
         val path = HomePath.of(record, latest, decision) ?: return null
-        val home = attempt { deps.prober.homeNow(s) }.getOrNull() ?: return null
+        val home = attempt { deps.prober.homeNow(s) }.getOrNull()?.takeIf { Restarts.settled(it) } ?: return null
         val boot = attempt { deps.prober.bootId(s) }.getOrNull() ?: return null
         val build = deps.about?.countLine ?: "unknown"
         val o = attempt { restarts.observe(record.id, boot, home, path, build, deps.clock.nowMs()) }.getOrNull() ?: return null

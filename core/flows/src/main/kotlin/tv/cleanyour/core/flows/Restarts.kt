@@ -129,6 +129,15 @@ class Restarts(private val store: DocumentStore) {
     }
 
     companion object {
+        // Whether the TV's Home answer is one to count: right after a boot Home resolves to the framework's FallbackHome
+        // (or to nothing) until the TV is up, which says nothing about the restart. Such a read is left for the next one
+        // in the same boot, so the boot it saw is not used up. Seen on the TV emulator: the known-TV reconnect answers
+        // half a minute before sys.boot_completed.
+        fun settled(home: HomeResolution): Boolean {
+            val c = home.resolved ?: return false
+            return c.pkg.value != "android" && "FallbackHome" !in c.cls
+        }
+
         // Whether the new home screen answers Home on `path`. The switch: Home resolves to ours. The helper: Home
         // resolves to the TV's own Google home screen it sends on from, with ours still a Home claimant (installed and
         // on); whether the helper's service is bound is not read (that would be a new command), the report says so.

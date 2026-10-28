@@ -115,6 +115,7 @@ class ManageMachine(
     private var visible = false
     private var hold: Pair<TvId, SessionHold>? = null
     private var autoJob: Job? = null
+    @Volatile private var homeSettled = false   // the last Home read was one to count (Restarts.settled)
 
     init {
         scope.launch {
@@ -200,6 +201,13 @@ class ManageMachine(
                     d.log.line("manage: reconnected by itself after ${i + 1} ${if (i == 0) "try" else "tries"}")
                     send(Reconnected(true))
                     connected()
+                    // A TV that restarted answers before it is up (Home still FallbackHome): read Home again a few
+                    // times, so the restart is counted once the TV has its home screen.
+                    repeat(SETTLE_TRIES) {
+                        if (homeSettled || !visible) return@launch
+                        delay(SETTLE_EVERY_MS)
+                        checkWizardHome()
+                    }
                     return@launch
                 }
             }
@@ -207,10 +215,12 @@ class ManageMachine(
     }
 
     private suspend fun checkWizardHome() {
+        homeSettled = false
         val id = state.value.current?.id ?: state.value.selected ?: return
         val s = d.access.live(id) ?: return
         val tv = d.tv(id) ?: return
         val home = attempt { d.prober.homeNow(s) }.getOrNull() ?: return
+        homeSettled = Restarts.settled(home)
         countRestart(tv, s, home)
         val profile = d.profileOf(tv)
         val changes = d.ledger.changes(id)
@@ -228,6 +238,7 @@ class ManageMachine(
     private suspend fun countRestart(tv: tv.cleanyour.core.model.Tv, s: tv.cleanyour.core.session.TvSession, home: tv.cleanyour.core.model.HomeResolution) {
         val latest = attempt { d.snapshots.latest(tv.id) }.getOrNull()
         val path = HomePath.of(tv, latest, attempt { d.homeDecisions.load(tv.id) }.getOrNull()) ?: return
+        if (!Restarts.settled(home)) return
         val boot = attempt { d.prober.bootId(s) }.getOrNull() ?: return
         val o = attempt { d.restarts.observe(tv.id, boot, home, path, d.about.countLine, d.clock.nowMs()) }.getOrNull() ?: return
         when (o.read) {
@@ -319,6 +330,8 @@ class ManageMachine(
         // A TV restart takes one to three minutes; the quiet reconnect tries for five.
         const val AUTO_EVERY_MS = 15_000L
         const val AUTO_TRIES = 21
+        const val SETTLE_EVERY_MS = 10_000L
+        const val SETTLE_TRIES = 12
     }
 
     // For the TV card: true while a run is open on this TV (the chip says "Working").
