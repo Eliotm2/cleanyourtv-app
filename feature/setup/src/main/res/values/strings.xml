@@ -300,6 +300,8 @@
     <!-- RF-LAUNCHER-250 F1 (owner copy): a switch-off the TV refused because the app runs the TV's inputs, on Done and in Manage -->
     <string name="kept_tv_input">{name}. Kept: it runs the TV\'s HDMI and tuner inputs.</string>
     <string name="done_skipped_many">{count, plural, one {# thing wouldn\'t switch off; it\'s harmless.} other {# things wouldn\'t switch off; they\'re harmless.}}</string>
+    <!-- 0.4.7 (issues #1279, #1649): Setup went on without the look the TV refused -->
+    <string name="done_look_skipped">The TV didn\'t take the look, so the new home screen shows its default one. You can send it again from Manage.</string>
     <string name="done_mibox_usb">Your USB port is powered again.</string>
     <string name="done_add_card_title">Add a card to the home screen</string>
     <!-- Optional, never a step of Setup: the new home screen starts with module cards off (RFC-CARDS-1) -->

@@ -710,6 +710,8 @@ fun DoneScreen(state: SetupState.Done, extras: SetupExtras, actions: SetupAction
             )
         }
         for (name in extras.doneKept) Body(msg(R.string.kept_tv_input, "name" to name), Modifier.padding(start = 4.dp, top = 12.dp))
+        // 0.4.7 (issues #1279, #1649): the TV refused the look, so the home screen shows its own; never a silent skip.
+        if (extras.doneLookSkipped) Body(stringResource(R.string.done_look_skipped), Modifier.padding(start = 4.dp, top = 12.dp))
         when {
             s.skipped.size == 1 -> Body(msg(R.string.done_skipped, "name" to s.skipped.single()), Modifier.padding(start = 4.dp, top = 12.dp))
             s.skipped.size > 1 -> Body(msg(R.string.done_skipped_many, "count" to s.skipped.size), Modifier.padding(start = 4.dp, top = 12.dp))

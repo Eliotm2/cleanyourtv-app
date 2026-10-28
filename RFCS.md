@@ -108,3 +108,26 @@ without a warning; no frozen type changes.
   On 3.0: the 288,500 build look cross product (43,050 distinct docs, 0 codec warnings), the
   10,000 file fuzz with the 25 keys in valid and out of range values, the theme fixtures (retro
   and nature-calm included), the encoded docs and the TV choices; the 2.7 runs stay beside them.
+
+## RFC-THEME-1: the look reaches the launcher through its ThemeProvider
+
+Issues #1279, #1649, #1094 and #1290: Android 11 firmware of Xiaomi and TCL refuses the shell's sync
+push into `/sdcard/Android/data/com.gathin.tvhome/files` ("PushAsset config.json: nonzero_exit(1)"),
+and on Android 14 the push succeeds but the file is the shell's, so the launcher cannot open it and
+ignores the look. Launcher 2.5 (versionCode 6) and later export `ThemeProvider` (authority
+`com.gathin.tvhome.theme`, guarded by `WRITE_SECURE_SETTINGS`), which upstream's `tools/theme.sh`
+uses. Smallest change: frozen signatures grow, nothing is removed. `:core:model` gets `FileRoute`
+(SYNC, THEME_PROVIDER), a defaulted `route` on `Op.PushAsset` and `Op.RemoveFile`, and
+`ProbeKind.LAUNCHER_FILE_SHA256` (takes a Path). `ConfigTransport.writePlanSteps` and
+`resetPlanSteps` take a defaulted `route`. With THEME_PROVIDER the renderer stages the file in TMP
+(the push now runs before an op's lines; no earlier op has both, so no earlier plan hash changes),
+writes it with a fixed template (`content write`, a copy from the staged file as the fallback when
+the content tool answers anything, the staged file removed) and checks it with a second template
+(`content read | sha256sum`), so the check is the launcher's view; a removal is one quoted
+`content delete` line. Both templates take one value from a two-entry list (`config.json`,
+`wallpaper.jpg`) and have golden files. The planner picks THEME_PROVIDER on Android 10 and later
+(`content write` exists from 10) when the launcher the look reaches has the provider (versionCode 6
+and up, or not read, the LookGates rule); Android 8 and 9 and older launchers keep SYNC. Journals,
+plan files and changes.json write `route` only when it is not SYNC, so every earlier file reads and
+writes the same. Failure policies are unchanged; Setup's look send still CONTINUEs, but Done now has
+a line for a refused look and the log and the report name the send and the TV's answer.

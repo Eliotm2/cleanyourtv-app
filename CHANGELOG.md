@@ -2,6 +2,15 @@
 
 All notable changes to the app. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.4.7 (unreleased)
+
+- The look and its picture now reach TVs that refused them: Xiaomi and TCL sets on Android 11
+  that answered "PushAsset config.json: nonzero_exit(1)", and Android 14 sets where the new home
+  screen ignored the look. The app hands them to the home screen itself, as the launcher's own
+  theme tool does, and checks them the way the home screen reads them.
+- When the TV still refuses the look during setup, the last screen says so, and a problem report
+  names the step and the TV's answer.
+
 ## 0.4.6 (2026-10-28)
 
 ### Home screen

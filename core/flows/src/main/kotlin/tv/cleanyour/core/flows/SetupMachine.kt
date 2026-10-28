@@ -155,6 +155,7 @@ data class SetupExtras(
     val doneNothing: Boolean = false,            // 0.3.3 (issue #15): the run changed nothing on the TV, so Done says so
     val doneNothingWhy: NothingWhy = NothingWhy.NOTHING_PLANNED,   // which "nothing was changed" body Done shows
     val doneHomeKept: HomeOutcome? = null,       // QA of 0.4.5: the switch was tried and the old home screen is back, why (Done's line)
+    val doneLookSkipped: Boolean = false,        // 0.4.7 (issues #1279, #1649): the run went on without the look the TV refused (Done's line)
     val restorePointPushed: Boolean = false,     // D44
     val dock: List<AppChoice> = emptyList(),     // D4 row and the dock sheet (S3b): the dock, then Row 2 and Row 3
     val apps: List<AppChoice> = emptyList(),     // installed apps for the dock sheet
@@ -1165,6 +1166,8 @@ class SetupMachine(
         lastFinished = f
         mutableExtras.update { it.copy(rollingBack = false, highlightStop = false, reconnect = null) }
         if (f.home == HomeOutcome.VERIFY_FAILED) logHomeSwitchFailure(f.plan)
+        // 0.4.7: a look the TV refused is named in the log with the TV's answer, never only counted as a skip.
+        attempt { RunLines.lookSkipped(f, deps.ledger) }.getOrNull()?.let { deps.log.line("setup: $it") }
         when {
             // A Manage write resumed from the S4e card (after process death) ends in Manage, never on Done.
             f.plan.kind != PlanKind.SETUP -> effect(SetupEffect.Navigate("manage/${tvId.value}"))
@@ -1255,8 +1258,10 @@ class SetupMachine(
         // of time, the person said no, the new one did not take over): Done says the home screen is
         // unchanged and why, never only "Your TV is ready".
         val homeKept = f?.home?.takeIf { !homeOn && it != HomeOutcome.CONFIRMED && plan?.sections?.isNotEmpty() == true }
+        // 0.4.7 (issues #1279, #1649): the look was in the plan and the TV refused it; Done says so.
+        val lookSkipped = skipped.any { it.group == DefaultPlanner.GROUP_THEME && it.op is Op.PushAsset }
         mutableExtras.update { it.copy(doneLines = skippedNames, doneKept = keptNames, doneNothing = off == 0 && !homeOn && !changed, doneNothingWhy = why,
-            keepsDebugging = keepsDebugging(tvId), doneHomeKept = homeKept) }
+            keepsDebugging = keepsDebugging(tvId), doneHomeKept = homeKept, doneLookSkipped = lookSkipped) }
         send(Ev.ShowDone(tvId, DoneSummary(off, homeOn, restorePointAt, skippedNames, recommended, restorePointEarlier)))
         session?.let { s -> mutableExtras.update { it.copy(restorePointPushed = deps.restorePoint.write(done, s, p)) } }
     }
@@ -1802,8 +1807,9 @@ class SetupMachine(
         fun commandsOf(plan: Plan): List<String> = plan.steps.flatMap { step ->
             val lines = step.rendered.lines.map { it.text }
             val t = step.rendered.transfer
-            lines + listOfNotNull(when (t) {
-                is Transfer.Push -> "sync:${t.dest.absolute} ${t.src.sha256.hex}"
+            // RFC-THEME-1: a push runs before the op's lines, so it is shown first.
+            listOfNotNull((t as? Transfer.Push)?.let { "sync:${it.dest.absolute} ${it.src.sha256.hex}" }) + lines + listOfNotNull(when (t) {
+                is Transfer.Push -> null
                 is Transfer.Pull -> "sync:${t.src.absolute} ${t.maxBytes}"
                 is Transfer.StreamInstall -> "sync:${t.src.path} ${t.size}"
                 null -> null

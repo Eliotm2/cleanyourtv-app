@@ -5,6 +5,7 @@ import java.net.URLEncoder
 import tv.cleanyour.core.engine.RunState
 import tv.cleanyour.core.model.Op
 import tv.cleanyour.core.model.TvId
+import tv.cleanyour.core.planner.DefaultPlanner
 import tv.cleanyour.core.spec.resolveFor
 
 // 0.4.6 (REPORTING-PROPOSAL 2.2): what the card said where it went wrong, so "Report a problem" on
@@ -99,6 +100,20 @@ object RunLines {
         val stderr = LogCodes.clean(failed.stderrHead, 160).takeIf { it.isNotEmpty() }?.let { " $it" }.orEmpty()
         return "$head: ${if (failed.undo) "undo step failed" else "step failed"}: ${LogCodes.op(failed.op)}: $code$stderr"
     }
+
+    // 0.4.7 (issues #1279, #1649): Setup sends its look with a CONTINUE policy, so a look the TV refused used to
+    // leave only "3 skipped". This names the skipped send and the TV's answer: "look not sent: PushAsset
+    // config.json via provider: nonzero_exit(1) <stderr head>". Null when the run sent its look, or had none.
+    suspend fun lookSkipped(r: RunState.Finished, ledger: RunLedger): String? {
+        val step = r.skipped.firstOrNull { it.group == DefaultPlanner.GROUP_THEME && it.op is Op.PushAsset } ?: return null
+        val failed = attempt { ledger.failureAt(r.plan.id, step.index) }.getOrNull()
+        val code = failed?.exit?.let { "nonzero_exit($it)" } ?: "failed"
+        val stderr = failed?.let { LogCodes.clean(it.stderrHead, 160) }?.takeIf { it.isNotEmpty() }?.let { " $it" }.orEmpty()
+        return "look not sent: ${LogCodes.op(step.op)}: $code$stderr"
+    }
+
+    // A finished run's line with the look's, when it was skipped.
+    suspend fun finished(r: RunState.Finished, ledger: RunLedger): String = label(r) + (lookSkipped(r, ledger)?.let { "; $it" } ?: "")
 }
 
 // 0.4.6 (REPORTING-PROPOSAL 2.1, 11 problem issues arrived with an empty report box): the problem
@@ -218,7 +233,7 @@ object ProblemReports {
         val log = attempt { d.diagnostics.redactedText() }.getOrDefault("")
         val step = if (context == null || context.connect || id == null) null else when (val r = attempt { d.engine.runState(id).value }.getOrNull()) {
             is RunState.Paused -> attempt { RunLines.pause(r, d.ledger) }.getOrNull()
-            is RunState.Finished -> RunLines.label(r)
+            is RunState.Finished -> attempt { RunLines.finished(r, d.ledger) }.getOrNull() ?: RunLines.label(r)
             else -> null
         }
         return fit(d.about, input, log, context?.let { c -> if (step != null) c.copy(step = step) else c }, d.redact)

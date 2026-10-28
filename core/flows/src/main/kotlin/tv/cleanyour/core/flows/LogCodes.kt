@@ -3,6 +3,7 @@ package tv.cleanyour.core.flows
 import tv.cleanyour.core.model.AdbError
 import tv.cleanyour.core.model.AdbException
 import tv.cleanyour.core.model.DeviceFacts
+import tv.cleanyour.core.model.FileRoute
 import tv.cleanyour.core.model.Op
 import tv.cleanyour.core.model.Snapshot
 import tv.cleanyour.core.planner.SwitchOffRule
@@ -79,8 +80,9 @@ object LogCodes {
         is Op.KillWatchdog -> "KillWatchdog"
         Op.PressHome -> "PressHome"
         is Op.Mkdir -> "Mkdir ${op.dir.name.lowercase()}"
-        is Op.PushAsset -> "PushAsset ${op.dest.segments.last()}"
-        is Op.RemoveFile -> "RemoveFile ${op.path.segments.last()}"
+        // RFC-THEME-1: a report says when the launcher's provider was the way in.
+        is Op.PushAsset -> "PushAsset ${op.dest.segments.last()}${if (op.route == FileRoute.THEME_PROVIDER) " via provider" else ""}"
+        is Op.RemoveFile -> "RemoveFile ${op.path.segments.last()}${if (op.route == FileRoute.THEME_PROVIDER) " via provider" else ""}"
         is Op.RestartHome -> "RestartHome ${op.component.flat}"
         is Op.StartActivity -> "StartActivity ${op.component.flat}"
         is Op.Read -> "Read ${op.kind.name.lowercase()}"
