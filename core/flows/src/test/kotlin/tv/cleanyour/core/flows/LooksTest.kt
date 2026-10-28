@@ -576,6 +576,31 @@ class LooksTest {
         assertEquals(0, m.state.value.waiting)
     }
 
+    // Fork (Thomas): the name after the greeting is kept on the phone and goes out with the saved look,
+    // in its own form and dock; never saved, the look goes out as before; saved empty, the key is left out.
+    @Test fun theGreetingNameGoesOutWithTheSavedLook() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        try {
+            assertEquals(LauncherConfigDoc(columns = 5), ForkGreeting.apply(LauncherConfigDoc(columns = 5)), "no store: unchanged")
+            ForkGreeting.store = h.documents
+            assertEquals(LauncherConfigDoc(greetingName = "Ana"), ForkGreeting.apply(LauncherConfigDoc(greetingName = "Ana")), "never saved: unchanged")
+            val apps = pkgs(5)
+            val (m, id) = homeWith(h, apps, HomeChoice(apps, "default", cards = false))
+            assertNull(m.state.value.forkGreeting)
+            m.dispatch(HomeScreenIntent.SetGreetingName("  Thomas\n ")); settle()
+            assertEquals("Thomas", m.state.value.forkGreeting)
+            val sent = h.pushes().last()
+            assertEquals("Thomas", sent.doc.greetingName)
+            assertEquals(apps, HomePrefs(h.documents).load(id)?.dock, "the saved dock is sent as it was")
+            assertEquals(apps.take(sent.doc.dockApps!!.size), sent.doc.dockApps)
+            m.dispatch(HomeScreenIntent.SetGreetingName("")); settle()
+            assertNull(h.pushes().last().doc.greetingName, "saved empty: the greeting alone")
+            assertEquals("", m.state.value.forkGreeting)
+        } finally {
+            ForkGreeting.store = null
+        }
+    }
+
     // 6. The dock sheet at 4 with 15 saved: it shows 12 and its new order goes first; the 3 it never
     // showed stay after it, in their order. An app moved by dragging keeps its new place.
     @Test fun aNewDockFromTheSheetKeepsTheAppsItDidNotShow() = runTest(timeout = 30.seconds) {

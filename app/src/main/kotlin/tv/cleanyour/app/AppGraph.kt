@@ -101,7 +101,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     val zone: ZoneId = ZoneId.systemDefault()
     val idGen = SecureIdGen(clock)                       // the planner's only id source (R0: 15)
     val dataDir = File(app.filesDir, "v1")               // one root: tv.json and drafts, journal, plans, snapshots (ARCHITECTURE 5.1)
-    val documents = FileStore(dataDir)
+    val documents = FileStore(dataDir).also { tv.cleanyour.core.flows.ForkGreeting.store = it }   // fork (Thomas): the greeting name
     val tvs = DocumentTvRepository(documents)
     val discovery = NsdDiscovery(app)
     val credentialGate = AndroidCredentialGate(app, clock)
@@ -175,7 +175,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     val ledger = RunLedger(documents, journal)
     val runner = PlanRunner(planner, engine, gate, ledger, facts, snapshots, prober)
     val restorePoint = RestorePointWriter(restoreFiles, blobs, ledger, runner)
-    val access = TvAccess(sessions, discovery, tvs, clock)
+    val access = TvAccess(sessions, discovery, tvs, clock, log = FlowLog { CytLog.i(it) })
     val sessionEnd = SessionEnd(sessions, discovery, tvs, runner, foreground)
     val homePrefs = HomePrefs(documents)
     val appPrefs = AppPrefs(documents)
@@ -219,6 +219,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         openWrites = openWrites,
         store = store.rules,       // STORES-PLAN 1
         about = about, homeDecisions = homeDecisions,   // 0.3.2 B1, B2
+        redact = Redactor::redact,                      // 0.4.6: what a card puts into a problem report
     )
 
     init {

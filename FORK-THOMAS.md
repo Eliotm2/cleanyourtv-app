@@ -1,8 +1,8 @@
 # Fork « thomas » de l'appli téléphone Clean Your TV
 
-Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.5, MIT).
+Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.6.1, MIT).
 Identifiant d'appli `fr.thomas.cleanyourtv` (amont : `tv.cleanyour.app`), nom « Clean Your TV · Thomas », versions
-`<amont>-thomas.N` (0.4.5-thomas.1 à la reprise de la 0.4.5) : elle s'installe à côté de l'appli d'origine, qui garde
+`<amont>-thomas.N` (0.4.6.1-thomas.1 à la reprise de la 0.4.6.1) : elle s'installe à côté de l'appli d'origine, qui garde
 son propre point de restauration.
 
 ## Ce que le fork change
@@ -27,10 +27,14 @@ son propre point de restauration.
 - **Switched off** (0.4.0-thomas.2) : au niveau Custom, les pastilles des groupes « ask » suivent l'état réel de la
   télé ; une appli coupée par un nettoyage antérieur (une autre appli) peut être remise.
 - **Tests alignés sur `pm uninstall` sans `--user 0`** (EngineTest, golden undo-everything-remove-launcher).
+- **Nom après la salutation** (0.4.6.1-thomas.1) : Manage › Home screen, champ « Name after the greeting ». Le nom est
+  gardé sur le téléphone (`ForkGreeting`, fichier `fork-greeting-name.txt`) et ajouté à chaque look envoyé
+  (`Look.encode` → `greeting_name`, que le launcher amont lit déjà : « BONSOIR, THOMAS »). Tant qu'aucun nom n'a été
+  enregistré, les looks partent tels quels ; enregistré vide, la clé est omise.
 - **Vérification de mise à jour** (0.4.0-thomas.1) : « Check for updates » lit les releases de ce fork
   (`Eliotm2/cleanyourtv-app`), signées avec la clé du fork, et ouvre la page de la dernière. Une version amont n'est
   jamais proposée : elle ne pourrait pas s'installer par-dessus cette clé. Ordre : la version amont, puis le numéro
-  `-thomas.N` (`Store.forkNewer`).
+  `-thomas.N` (`Store.forkNewer`), versions amont à quatre parties comprises (0.4.6.1).
 - **Nombre d'apps par rangée** : depuis la 0.4.0 la feuille Look de l'amont choisit « apps in a row » (4 à 8) et
   l'écrit dans le look ; le réglage maison `ForkLook` (5 par défaut) est retiré. Choisir 5 une fois dans Look.
 - **Workflows** : ceux de l'amont sont retirés (ils signent et publient avec les secrets de l'amont) ; seul

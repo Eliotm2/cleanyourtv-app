@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Fork (Thomas) : seules les chaînes ajoutées par le fork sont traduites. -->
 <resources>
+    <string name="home_greeting_label">Nom après la salutation</string>
+    <string name="home_greeting_note">Affiché après Bonjour ou Bonsoir sur la télé, par exemple BONSOIR, THOMAS. Laisse vide pour la salutation seule.</string>
+    <string name="home_greeting_send">Envoyer à la télé</string>
     <string name="home_row_auto_start">Boutons de la télécommande après redémarrage (TCL)</string>
     <string name="home_row_auto_start_note">Autorise le service « Bouton Accueil » du launcher à démarrer avec la télé, pour que les boutons associés sur la télé marchent encore après un redémarrage. Active d\'abord le service dans les réglages d\'accessibilité de la télé.</string>
     <string name="home_auto_start_done">Le service peut maintenant démarrer avec la télé. Redémarre-la pour vérifier.</string>

@@ -9,12 +9,15 @@ import tv.cleanyour.core.model.Component
 import tv.cleanyour.core.model.EnabledState
 import tv.cleanyour.core.model.PackageName
 import tv.cleanyour.core.model.TvId
+import tv.cleanyour.core.ops.HomePlaceholder
 import tv.cleanyour.core.planner.FireOs
 import tv.cleanyour.core.planner.Plan
 import tv.cleanyour.core.planner.PlanRequest
 import tv.cleanyour.core.planner.TclGoogleTv
 import tv.cleanyour.core.spec.DockLayers
 import tv.cleanyour.core.spec.Looks
+import tv.cleanyour.core.spec.ProfileResolution
+import tv.cleanyour.core.spec.resolveFor
 import tv.cleanyour.core.spec.StyleId
 
 // M2 Home screen: the dock (S3b sheet), the look (theme picker), "Use the TV's own home screen"
@@ -33,6 +36,8 @@ data class AppChoice(val pkg: PackageName, val name: String)
 // wizard has to stay on (HomeSwitchRisk) and WIZARD_WIFI needs a list first.
 // `setupAgain`: running Setup again can add it (nothing blocks it, or the block can change).
 // `helpAddTv`: a list for this TV is what is missing; "Help add this TV" makes its report.
+// `earlier` (beta3): an earlier Setup decided it, with another version or list (HomeDecision.earlier),
+// so the screen says that instead of a reason that may no longer hold, and offers Setup again.
 data class NotOnTv(
     val reason: HomeBlock?,
     val brand: String,
@@ -40,6 +45,7 @@ data class NotOnTv(
     val unlisted: Boolean = false,
     val setupAgain: Boolean = false,
     val helpAddTv: Boolean = false,
+    val earlier: Boolean = false,
 )
 
 // 0.4.0: a picture of the Picture row: a gallery picture by id, with its file for the thumbnail
@@ -67,6 +73,7 @@ data class HomeScreenState(
     val tclRemoteKeys: Boolean = false,                 // issue #275: a TCL Google TV, whose remote's gear, Netflix and YouTube buttons need its own home screen
     val endedLook: String? = null,                      // 0.4.0: the name of a dated look that has ended and is still on the TV
     val pictureId: String? = null,                      // 0.4.0: the saved picture choice (HomeChoice.picture)
+    val forkGreeting: String? = null,                   // fork (Thomas): the name after the greeting; null until saved once
     val pictures: List<PictureOption> = emptyList(),    // 0.4.0: the gallery of the Picture row
     val ownPicture: BlobRef? = null,                    // 0.4.0: the person's photo kept for this TV (OwnPicture), as a file
     val ownDim: Int = OwnPicture.DEFAULT_DIM,           // and its dim
@@ -102,6 +109,7 @@ data class HomeScreenState(
 
 sealed interface HomeScreenIntent {
     data object AllowAutoStart : HomeScreenIntent      // fork (Thomas): TCL auto-start permission for the launcher
+    data class SetGreetingName(val name: String) : HomeScreenIntent   // fork (Thomas): saved, then the look is sent again
     data class SetDock(val dock: List<PackageName>) : HomeScreenIntent
     data class SetTheme(val id: String, val picture: String? = null) : HomeScreenIntent
     // 0.4.0: the Look sheet, starting from the TV's look; look2: after a failed send, the kept draft.
@@ -151,11 +159,15 @@ class HomeScreenMachine(
     private var kept: LookDraft? = null      // the draft of a send in flight, or of one that failed (OpenLook reopens it)
     private var sending = false              // one send per UseLook
 
-    init { scope.launch { load(); checkDrift() } }
+    init { scope.launch { load(); checkDrift() }; scope.launch { send(Greeting(ForkGreeting.load())) } }
+
+    private data class Greeting(val name: String?)   // fork (Thomas)
 
     override fun reduce(state: HomeScreenState, event: Any): HomeScreenState = when (event) {
+        is Greeting -> state.copy(forkGreeting = event.name)
         is Loaded -> event.s.copy(busy = state.busy, stockPreview = state.stockPreview, drift = state.drift, updatePreview = state.updatePreview,
-            newPicture = state.newPicture, newDim = state.newDim, lookFailed = state.lookFailed, lookSending = state.lookSending).let { s ->
+            newPicture = state.newPicture, newDim = state.newDim, lookFailed = state.lookFailed, lookSending = state.lookSending,
+            forkGreeting = state.forkGreeting).let { s ->
             saved = event.saved; earlier = event.earlier; cards = event.cards; keyNames = event.keyNames
             s.copy(look = state.look?.let { drafts.refresh(it, lookContext(s)) })
         }
@@ -259,6 +271,7 @@ class HomeScreenMachine(
             HomeScreenIntent.PreviewUpdate -> scope.launch { previewUpdate() }
             HomeScreenIntent.UpdateHomeScreen -> scope.launch { update() }
             HomeScreenIntent.AllowAutoStart -> scope.launch { allowAutoStart() }
+            is HomeScreenIntent.SetGreetingName -> if (after.busy == null) scope.launch { setGreetingName(event.name) }
             HomeScreenIntent.RunSetupAgain -> if (after.notOnTv?.setupAgain == true) effect(ManageEffect.Navigate("setup/${tvId.value}"))
             HomeScreenIntent.HelpAddTv -> if (after.notOnTv?.helpAddTv == true) effect(ManageEffect.Navigate("report/tv/${tvId.value}"))
             else -> {}
@@ -302,7 +315,9 @@ class HomeScreenMachine(
             ?.let { id -> drafts.gallery().firstOrNull { it.id == id }?.name ?: id }
             else choice?.endedLook(today)?.let { id -> theme(id)?.name ?: id }
         send(Loaded(HomeScreenState(tv.nickname, dock, apps, if (choice?.isNew == true) null else lookId, offeredThemes(d),
-            stock = profile?.stockLaunchers?.firstOrNull(),
+            // 0.4.6: a TV on a brand set or none (R0) has no list of its own; the stock home the
+            // switch armed its watchdog with is the TV's own then.
+            stock = profile?.stockLaunchers?.firstOrNull() ?: attempt { HomePlaceholder.stockFromRecords(d.ledger.changes(tvId)) }.getOrNull(),
             homeScreenOurs = tv.launcher != null, columns = columns, updateTo = updateTo(tv, packages),
             tvSideSettings = (packages[Launcher.pkg]?.versionCode ?: 0) >= FIRST_WITH_TV_SETTINGS,
             notOnTv = notOnTv(tv, snap), tclRemoteKeys = snap != null && TclGoogleTv.applies(snap.facts, snap),
@@ -322,9 +337,20 @@ class HomeScreenMachine(
     // why, as for issue #8, instead of offering a dock and a look for it.
     private suspend fun notOnTv(tv: tv.cleanyour.core.model.Tv, snap: tv.cleanyour.core.model.Snapshot?): NotOnTv? {
         if (tv.launcher != null || snap == null) return null
-        val reason = attempt { d.homeDecisions.load(tvId) }.getOrNull()?.block?.let { b -> HomeBlock.entries.firstOrNull { it.name == b } }
+        val decision = attempt { d.homeDecisions.load(tvId) }.getOrNull()
+        val reason = decision?.block?.let { b -> HomeBlock.entries.firstOrNull { it.name == b } }
         if (Launcher.pkg in snap.packages && reason != HomeBlock.HOME_CHANGED) return null
-        val unlisted = tv.profileId == null
+        // beta3 (issues #701, #1273): a block an earlier Setup decided, with an earlier version of
+        // the app or another list than the TV resolves to now, may not hold any more: Setup again
+        // decides it with this version. The TV's own facts (it refuses other home screens, its
+        // Android is too old, its family boot-loops, it is Google's casting hardware, its remote's
+        // app buttons need its home screen) and a home screen the person changed do not change with
+        // the app, so those keep their line and their own next step.
+        val now = attempt { d.profiles.resolveFor(snap) }.getOrNull()
+        val earlier = reason != null && decision?.earlier(d.about.version, now) == true
+        val unlisted = tv.profileId == null && (!earlier || now !is ProfileResolution.Exact)
+        if (earlier) return NotOnTv(reason = reason, brand = LogCodes.clean(snap.facts.brand, 40).ifEmpty { tv.nickname },
+            unlisted = unlisted, setupAgain = true, earlier = true)
         val setupAgain = when (reason) {
             null, HomeBlock.NONE, HomeBlock.WIZARD_WIFI_UNKNOWN -> true
             // Issue #8: the person can make the TV's own home screen Home again, and on a TV an exact
@@ -333,6 +359,10 @@ class HomeScreenMachine(
             // Forgetting and adding the network again makes the TV's own Wi-Fi settings the owner; on a
             // TV no exact profile knows the wizard still has to stay on (HomeSwitchRisk), so not there.
             HomeBlock.WIZARD_WIFI -> !unlisted
+            // beta3: with that other home screen app removed, Setup can switch.
+            HomeBlock.OTHER_HOME -> true
+            // beta4: with PatchWall off, or Mi TV+ and its web content back on, Setup can switch.
+            HomeBlock.PATCHWALL_FEEDS -> true
             else -> false
         }
         val needsList = reason == HomeBlock.UNKNOWN_HOME || reason == HomeBlock.WIZARD_STAYS_ON || (reason == HomeBlock.WIZARD_WIFI && unlisted)
@@ -371,6 +401,17 @@ class HomeScreenMachine(
     // "Update the home screen": the bundled launcher over ours, in place (RFC-LAUNCHER-1). The dock,
     // the look (config.json) and the card answers stay on the TV, since only an uninstall removes
     // them, so nothing is pushed again.
+    // Fork (Thomas): the name is saved on the phone, then the saved look goes to the TV again, as a dock
+    // change sends it (its own form, its own dock); Look.encode adds the name (ForkGreeting).
+    private suspend fun setGreetingName(name: String) {
+        attempt { ForkGreeting.save(name) }
+        send(Greeting(ForkGreeting.load()))
+        val choice = savedChoice()
+        val dock = savedDock() ?: state.value.dock.map { it.pkg }
+        if (choice?.isNew == true) pushSaved(choice, dock)
+        else apply(dock, state.value.themeId, state.value.pictureId, columns = savedColumns())
+    }
+
     // Fork (Thomas): the AllowAutoStart plan, gated and journaled like the update.
     private suspend fun allowAutoStart() {
         val r = writer.write(tvId, PlanRequest.AllowLauncherAutoStart, fresh = true) { send(BusyNow(it)) }
@@ -409,6 +450,7 @@ class HomeScreenMachine(
     }
 
     companion object {
+
         // Launcher 2.4 (versionCode 5) added Launcher settings on the TV (RF-LAUNCHER-240 F16).
         const val FIRST_WITH_TV_SETTINGS = 5L
         const val DEFAULT_LOOK = "default"
@@ -561,12 +603,9 @@ class HomeScreenMachine(
     // installed (PRODUCT-SPEC M2).
     private suspend fun useStock(stock: Component) {
         send(Preview(null))
-        val r = writer.write(tvId, PlanRequest.UseStockHome(stock)) { send(BusyNow(it)) }
+        val r = writer.useStockHome(tvId, stock) { send(BusyNow(it)) }
         send(BusyNow(null))
-        if (r is WriteResult.Done) {
-            d.tv(tvId)?.let { d.tvs.upsert(it.copy(launcher = null)) }
-            effect(ManageEffect.Snackbar(SnackKind.HOME_SAVED, d.nameOf(stock.pkg), false))
-        }
+        if (r is WriteResult.Done) effect(ManageEffect.Snackbar(SnackKind.HOME_SAVED, d.nameOf(stock.pkg), false))
         load()
     }
 }

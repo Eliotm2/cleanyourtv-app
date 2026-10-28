@@ -43,7 +43,8 @@ internal class Look(val doc: LauncherConfigDoc, val digest: Sha256, val config: 
         }
 
         // A doc and its wallpaper as the push sends them, encoded and stored.
-        suspend fun encode(encoder: ConfigEncoder, blobs: BlobStore, doc: LauncherConfigDoc, wallpaper: BlobRef?): Look {
+        suspend fun encode(encoder: ConfigEncoder, blobs: BlobStore, built: LauncherConfigDoc, wallpaper: BlobRef?): Look {
+            val doc = ForkGreeting.apply(built)   // fork (Thomas): the name after the greeting
             val bytes = encoder.encode(doc)
             return Look(doc, sha256Of(bytes), blobs.putBytes(bytes), wallpaper)
         }

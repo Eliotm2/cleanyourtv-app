@@ -21,6 +21,7 @@ import tv.cleanyour.core.model.Op
 import tv.cleanyour.core.trust.DownloadHosts
 import tv.cleanyour.testing.fixtures.Samples
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -69,10 +70,24 @@ class FullStoreTest {
 
     @Test fun theUpstreamVersionComesFirstThenTheForksNumber() {
         assertTrue(Store.forkNewer("0.4.1-thomas.1", "0.4.0-thomas.9"))
+        assertTrue(Store.forkNewer("0.4.6.1-thomas.1", "0.4.6-thomas.9"))
+        assertTrue(!Store.forkNewer("0.4.6-thomas.9", "0.4.6.1-thomas.1"))
         assertTrue(Store.forkNewer("0.4.0-thomas.10", "0.4.0-thomas.9"))
         assertTrue(Store.forkNewer("0.4.0-thomas.1", "0.3.7-thomas.9"))
         assertTrue(!Store.forkNewer("0.3.7-thomas.9", "0.4.0-thomas.1"))
         assertTrue(!Store.forkNewer("0.4.0", "0.4.0-thomas.1"))
+    }
+
+    // A four-part hotfix (0.4.6.1): 0.4.6 is offered it; the 0.4.7-beta1 test build, already past it, is not.
+    @Test fun aFourPartHotfixIsOfferedToTheReleaseBeforeItOnly() = runBlocking {
+        fun latest(tag: String, current: String) = runBlocking { Store.updateChecker(OneAnswer(200, "{\"tag_name\":\"v$tag\"}")).latestNewerThan(current) }
+        assertTrue(Store.offered("0.4.6.1", "0.4.6"))
+        assertFalse(Store.offered("0.4.6.1", "0.4.7-beta1"))
+        assertFalse(Store.offered("0.4.6.1", "0.4.6.1"))
+        assertTrue(Store.offered("0.4.7", "0.4.7-beta1"))
+        // Fork (Thomas): the checker reads the fork's releases; four-part upstream versions order first.
+        assertEquals("0.4.6.1-thomas.1", latest("0.4.6.1-thomas.1", "0.4.6-thomas.3"))
+        assertEquals("", latest("0.4.6-thomas.3", "0.4.6.1-thomas.1"))
     }
 
     @Test fun softwareUpdatesStayTheOwnersChoice() {

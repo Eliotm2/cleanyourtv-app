@@ -29,13 +29,13 @@ object Store : StorePorts {
         }
     }
 
-    // Fork (Thomas): "0.4.1-thomas.1" > "0.4.0-thomas.7" > "0.4.0-thomas.6": the upstream version
+    // Fork (Thomas): "0.4.6.1-thomas.1" > "0.4.6-thomas.2" > "0.4.6-thomas.1": the upstream version
     // first, then the fork's own number. A version without "-thomas.N" counts as thomas.0.
     internal fun forkNewer(tag: String, current: String): Boolean {
         fun parts(v: String): List<Int> {
             val up = v.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
             val n = Regex("-thomas\\.(\\d+)").find(v)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-            return List(3) { up.getOrElse(it) { 0 } } + n
+            return List(4) { up.getOrElse(it) { 0 } } + n   // upstream versions have up to four parts (0.4.6.1)
         }
         val a = parts(tag)
         val b = parts(current)
