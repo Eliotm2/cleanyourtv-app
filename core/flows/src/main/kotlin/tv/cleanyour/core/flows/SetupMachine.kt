@@ -1247,7 +1247,11 @@ class SetupMachine(
                 send(Ev.Stop(tvId, homePutBackCard(f.plan.id)))
             f.status == RunStatus.ABANDONED -> effect(SetupEffect.Navigate("manage/${tvId.value}"))
             f.home != null && f.home != HomeOutcome.CONFIRMED -> send(Ev.Stop(tvId, homeCard(f, switchedOffSoFar(f.plan))))
-            else -> showDone(tvId, f, homeOn = f.plan.sections.isNotEmpty() && f.home == HomeOutcome.CONFIRMED)
+            // 0.4.7-beta1 QA: the engine finishes a confirmed section with no HomeOutcome (null; only a rolled back
+            // one carries its outcome, and that went to the card above), so a run that got here with a section held
+            // its switch or its helper. Before, Done never said "New home screen on" and the TV record never got
+            // its launcher, so Manage took a helper TV for "installed, not in use".
+            else -> showDone(tvId, f, homeOn = f.plan.sections.isNotEmpty() && (f.home == null || f.home == HomeOutcome.CONFIRMED))
         }
     }
 

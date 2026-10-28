@@ -2,6 +2,13 @@ package tv.cleanyour.core.flows
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import tv.cleanyour.core.planner.PlanKind
+import tv.cleanyour.core.planner.PlanResult
+import tv.cleanyour.core.engine.RunStatus
+import tv.cleanyour.core.model.Op
+import tv.cleanyour.core.model.HomeClaimant
+import tv.cleanyour.core.model.HomeResolution
+import tv.cleanyour.testing.fixtures.Issue034
 import tv.cleanyour.core.model.SettingKey
 import tv.cleanyour.core.model.Snapshot
 import tv.cleanyour.core.model.SnapshotReason
@@ -104,6 +111,53 @@ class HomeHelperFlowsTest {
         assertNull(HomeKept.of(SetupExtras(homePossible = false, homeBlock = HomeBlock.NONE, helperOn = true)))
         assertEquals(HomeKept.SwitchFailed(tv.cleanyour.core.engine.HomeOutcome.TIMED_OUT),
             HomeKept.of(casting.copy(helperOn = true, doneHomeKept = tv.cleanyour.core.engine.HomeOutcome.TIMED_OUT)))
+    }
+
+    // 0.4.7-beta1 QA (S4): the helper on, the TV's own home screen Home on purpose and no launcher on the TV record:
+    // the Home screen page is not "installed, not in use"; it has the helper's card, Dock and Look. Manage's card says
+    // the helper's line, and the Cards row is not "this TV keeps its own home screen".
+    @Test fun withTheHelperOnTheHomeScreenPageShowsItsCardNotInstalledButNotInUse() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        val tv = h.knownTv().copy(launcher = null).also { h.tvs.upsert(it) }
+        HomeDecisions(h.documents).save(tv.id, HomeDecision(false, redirect = true))
+        val stock = Samples.stockLauncher
+        h.snapshots.save(Samples.snapshot(packages = Samples.miTvPackages() + (Launcher.pkg to Issue034.launcherState(Samples.zeroHash)),
+            home = HomeResolution(stock, listOf(HomeClaimant(stock, 2))), takenAtMs = Samples.NOW_MS + 40)
+            .helper(service, "1", redirectOverlay, at = Samples.NOW_MS + 40))
+        val m = HomeScreenMachine(h.manageDeps(homeHelper = true), backgroundScope, tv.id).also { settle() }
+        assertNull(m.state.value.notOnTv)
+        assertEquals(HelperShown.ON, m.state.value.helper?.shown)
+        val card = assertNotNull(ManageMachine(h.manageDeps(homeHelper = true), backgroundScope, tv.id).also { settle() }.state.value.current)
+        assertFalse(card.homeInstalledNotInUse)
+        assertTrue(card.homeHelperOn)
+    }
+
+    // 0.4.7-beta1 QA: the engine finishes a confirmed section with no HomeOutcome, so Done takes that for the switch or
+    // the helper held: "New home screen on" and the launcher on the TV record (Manage reads it).
+    @Test fun aConfirmedSectionWithNoOutcomeIsTheNewHomeScreenOn() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        h.sessions.allowPromptFor[HOST] = "AB:CD:7F:2A"
+        h.setupPlan = h.plan(listOf(Op.Disable(adPkg)), takeover = true)
+        h.engine.onStart = { p -> finish(p, RunStatus.COMPLETED, null) }
+        val m = SetupMachine(h.setupDeps(), backgroundScope, SetupStart.Fresh)
+        toFound(h, m)
+        m.dispatch(SetupIntent.MakeItClean); settle()
+        val d = kotlin.test.assertIs<SetupState.Done>(m.state.value)
+        assertTrue(d.summary.homeScreenOn)
+        assertNull(m.extras.value.doneHomeKept)
+        assertNotNull(h.tvs.tvs.value.single().launcher)
+    }
+
+    // Undo everything with the helper on says it switches it off (the plan takes our entry out).
+    @Test fun theUndoPreviewNamesTheHelper() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        val tv = h.knownTv()
+        val previous = h.planner.respond
+        h.planner.respond = { r, snap -> if (r is PlanRequest.UndoEverything) PlanResult.Ok(h.plan(listOf(Op.AccessibilityRemove(null, HelperLines.SERVICE)),
+            kind = PlanKind.UNDO_EVERYTHING, id = "01FAKEUNDO0000000000000001")) else previous(r, snap) }
+        val m = RestorePointMachine(h.manageDeps(homeHelper = true), backgroundScope, tv.id).also { settle() }
+        m.dispatch(RestorePointIntent.PreviewUndo); settle()
+        assertTrue(kotlin.test.assertIs<RestorePhase.Preview>(m.state.value.phase).preview.helperOff)
     }
 
     @Test fun theCardSaysWhatTheTvShows() {

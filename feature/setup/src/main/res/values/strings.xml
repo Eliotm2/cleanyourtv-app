@@ -425,10 +425,10 @@
     <!-- RFC-HELPER-1 (test build): the Customise switch "Home button helper" and its consent (PLAN 4.2). -->
     <string name="helper_group">Home button</string>
     <string name="helper_row">Home button helper</string>
-    <string name="helper_row_note">Keep the TV\'s own home screen and send the Home button to the new one</string>
+    <string name="helper_row_note">The TV\'s own home screen stays on; the Home button opens the new one</string>
     <string name="helper_row_on">On: the Home button opens the new home screen, and the TV\'s own stays on</string>
     <string name="helper_consent_title">Home button helper</string>
-    <string name="helper_consent_keep">Your TV keeps its own home screen, and its setup wizard stays on, so casting and your Wi-Fi are not touched. A small helper inside the new home screen watches for the TV\'s home screen and opens the new one instead.</string>
+    <string name="helper_consent_keep">The TV\'s own home screen stays on; the Home button opens the new one. Its setup wizard stays on too, so casting and your Wi-Fi are not touched. A small helper inside the new home screen watches for the TV\'s home screen and opens the new one instead.</string>
     <string name="helper_consent_sees">The helper is an Android accessibility service. Android will say it can see your screen and the buttons you press. This one asks Android only for which app is open, not for what is on screen, and not for your button presses. It has no internet access. It is part of the open-source home screen by Gathin (github.com/Gathin23/cleanyourtv), the same app this app installs.</string>
     <string name="helper_consent_changes">What changes: you may see the TV\'s own home screen for a moment before the new one. If the TV or a cleaner app force-stops the home screen, the helper goes off until you switch it on again here.</string>
     <string name="helper_consent_off">You can switch it off any time: here, with Undo, or on the TV in Settings &gt; Accessibility &gt; Home button.</string>

@@ -129,6 +129,7 @@ internal fun ColumnScope.PreviewContent(pv: UndoPreview, baseline: String, onInt
         CheckLine(msg(R.string.restore_preview_things, "count" to pv.thingsBack), state = CheckState.NONE)
         pv.stockName?.let { CheckLine(msg(R.string.restore_preview_home, "name" to it), state = CheckState.NONE) }
         if (pv.wizardBack) CheckLine(stringResource(R.string.restore_preview_wizard), state = CheckState.NONE)
+        if (pv.helperOff) CheckLine(stringResource(R.string.restore_preview_helper), state = CheckState.NONE)   // RFC-HELPER-1
     }
     // UX finding 17: the choice only when the new home screen is on the TV.
     if (pv.launcherInstalled) {

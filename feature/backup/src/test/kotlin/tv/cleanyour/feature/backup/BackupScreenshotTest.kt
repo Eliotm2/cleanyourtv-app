@@ -45,6 +45,8 @@ object BackupShots {
         Shot("restore_preview_keep") { SheetOver({ RestoreScreen(restore(), {}, {}) }) { PreviewContent(preview, BASELINE) {} } },
         Shot("restore_preview_remove") { SheetOver({ RestoreScreen(restore(), {}, {}) }) { PreviewContent(preview.copy(removeLauncher = true, stockName = null, wizardBack = false), BASELINE) {} } },
         // UX finding 17: the new home screen was never installed (the TV keeps its own): no choice about it.
+        // RFC-HELPER-1 (test build): the Home button helper is on, so Undo everything switches it off.
+        Shot("restore_preview_helper") { SheetOver({ RestoreScreen(restore(), {}, {}) }) { PreviewContent(preview.copy(stockName = null, wizardBack = false, helperOff = true), BASELINE) {} } },
         Shot("restore_preview_not_installed") { SheetOver({ RestoreScreen(restore(), {}, {}) }) { PreviewContent(preview.copy(stockName = null, wizardBack = false, launcherInstalled = false), BASELINE) {} } },
         Shot("restore_confirm") { SheetOver({ RestoreScreen(restore(), {}, {}) }) { ConfirmContent {} } },
         Shot("restore_factory_sheet") { SheetOver({ RestoreScreen(restore(googleTv = true), {}, {}) }) { FactoryContent({}, {}) } },
