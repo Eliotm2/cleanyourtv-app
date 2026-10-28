@@ -267,7 +267,12 @@ object TvReport {
         )
         if (claimants.isEmpty()) appendLine("Claimants: none")
         for (c in claimants) appendLine("Claimant: ${named(s, c.component)} priority ${c.priority}")
-        if (input.accessibility) appendAccessibility(s)
+        // Only when the probe read either setting or the overlay names a redirect: a report from a
+        // snapshot that knows nothing about accessibility stays as it was.
+        if (input.accessibility && (tv.cleanyour.core.model.SettingKey.ENABLED_ACCESSIBILITY in s.settings ||
+                tv.cleanyour.core.model.SettingKey.ACCESSIBILITY_ENABLED in s.settings || tv.cleanyour.core.spec.HomeHelperKeys.redirectOf(s.launcherOverlay) != null)) {
+            appendAccessibility(s)
+        }
         val system = s.packages.filter { it.value.system }.toSortedMap(compareBy { it.value })
         val others = s.packages.size - system.size
         appendLine()

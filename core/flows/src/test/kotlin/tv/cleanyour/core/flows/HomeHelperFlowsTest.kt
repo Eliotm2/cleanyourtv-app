@@ -136,7 +136,9 @@ class HomeHelperFlowsTest {
         assertFalse("talkback" in text, "another app's service is never named")
         val plain = TvReport.text(TvReportInput(about, Samples.miTvSnapshot(), null, null, accessibility = false))
         assertFalse("\nAccessibility\n" in plain, "a release report is as before")
-        val none = TvReport.text(TvReportInput(about, Samples.miTvSnapshot(), null, null, accessibility = true))
+        assertFalse("\nAccessibility\n" in TvReport.text(TvReportInput(about, Samples.miTvSnapshot(), null, null, accessibility = true)),
+            "nothing read about accessibility, no section")
+        val none = TvReport.text(TvReportInput(about, Samples.miTvSnapshot().helper(null, null), null, null, accessibility = true))
         assertTrue("Services listed: none" in none && "Home button helper: not listed" in none && "Switched on: unknown" in none, none)
     }
 }

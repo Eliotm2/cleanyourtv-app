@@ -402,9 +402,12 @@ class DefaultEngine(
                 if (e.error.isLost()) return HomeOutcome.CONNECTION_LOST else null
             }
             // RFC-HELPER-1: with the helper the TV's own home screen shows for a moment before the new
-            // one (PLAN 3.3), so a focus on it counts only when it is still there a second later.
+            // one (PLAN 3.3; seconds on a slow TV, as on the emulator), so a focus on it counts only
+            // when it is still there at each of the next looks.
             val stays = focus != null && focus.pkg in section.rollbackIfFocus && StepR.isHelper(section) && try {
-                delay(HELPER_FOCUS_AGAIN_MS); prober.homeFocus(run.session)?.pkg == focus.pkg
+                var still = true
+                repeat(HELPER_FOCUS_LOOKS) { if (still) { delay(HELPER_FOCUS_AGAIN_MS); still = prober.homeFocus(run.session)?.pkg == focus.pkg } }
+                still
             } catch (e: AdbException) {
                 if (e.error.isLost()) return HomeOutcome.CONNECTION_LOST else false
             }
@@ -1116,7 +1119,9 @@ class DefaultEngine(
     companion object {
         val GATED = setOf(Privilege.PROFILE_STEP, Privilege.COMMUNITY, Privilege.TAKEOVER)
         const val WATCHDOG_MARGIN_MS = 10_000L   // the phone's window ends at least this long before the watchdog fires (R1 R-1)
-        const val HELPER_FOCUS_AGAIN_MS = 1_000L   // RFC-HELPER-1: the second look at a focus on the TV's own home screen
+        // RFC-HELPER-1: the looks again at a focus on the TV's own home screen, and how far apart.
+        const val HELPER_FOCUS_LOOKS = 3
+        const val HELPER_FOCUS_AGAIN_MS = 1_500L
         // 0.4.6: the check's extra Home presses while a TV app is in front: at most this many, this
         // far apart, within this long of the section opening (about the first minute after the TV
         // starts, when a TV that starts on its last input brings that input up).

@@ -93,7 +93,7 @@ class HelperSectionTest {
         val engine = h.engine()
         val plan = h.helperPlan()
         checkScreen(h, engine, plan)
-        advanceTimeBy(5_000); runCurrent()
+        advanceTimeBy(10_000); runCurrent()   // the poll, then three more looks 1.5 s apart
         val fin = assertIs<RunState.Finished>(h.settle(engine))
         assertEquals(HomeOutcome.WRONG_FOCUS, fin.home)
         assertEquals(null, h.tv.settings[SettingKey.ENABLED_ACCESSIBILITY])
@@ -109,7 +109,7 @@ class HelperSectionTest {
         h.tv.focus = h.stock
         var seen = false
         h.tv.answer = { line -> if (line.startsWith("dumpsys activity activities")) { if (seen) h.tv.focus = h.launcher; seen = true }; null }
-        advanceTimeBy(5_000); runCurrent()
+        advanceTimeBy(10_000); runCurrent()
         assertIs<RunState.AwaitingConfirm>(engine.runState(h.tv.tvId).value)
         assertEquals(service.flat, h.tv.settings[SettingKey.ENABLED_ACCESSIBILITY])
     }
