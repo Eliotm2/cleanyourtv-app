@@ -7,8 +7,10 @@ android {
     // The app's version, in one place for every store flavour and for F-Droid's checkupdates
     // (STORES-PLAN 0 and 3): GitHub, F-Droid and Google Play ship the same versionCode and versionName.
     defaultConfig {
-        versionCode = 21
-        versionName = "0.4.6"
+        // Test build 0.4.7-beta1 (a GitHub pre-release, never offered by a release's update check): code 22
+        // installs over 0.4.6 (21) and every earlier build with the same key; the 0.4.7 release takes 23.
+        versionCode = 22
+        versionName = "0.4.7-beta1"
     }
     // STORES-PLAN 1: one codebase, two store builds, the same applicationId and signing certificate.
     // `full` (GitHub and F-Droid) checks GitHub for a newer release and offers the optional add-ons;
