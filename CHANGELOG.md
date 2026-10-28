@@ -10,6 +10,10 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   theme tool does, and checks them the way the home screen reads them.
 - When the TV still refuses the look during setup, the last screen says so, and a problem report
   names the step and the TV's answer.
+- A TV that got a new address on your Wi-Fi (a mesh network, a new router) is found again: when
+  its saved address does not answer, the app looks for it on the network, checks it is the same
+  TV with the key it already allowed, and saves the new address. No other TV is connected, and
+  none shows an Allow prompt.
 
 ## 0.4.6 (2026-10-28)
 
