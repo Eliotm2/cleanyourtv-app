@@ -122,6 +122,8 @@ class ManageDeps(
     val pictures: PictureSource = themes as? PictureSource ?: PictureSource.NONE,
     // 0.4.6: the app's redactor, run over what a card puts into a problem report (ReportContext).
     val redact: (String) -> String = { it },
+    // RFC-HELPER-1: whether this build shows the Home button helper (the test build's bundled switch).
+    val homeHelper: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
 ) {
     fun tv(id: TvId): Tv? = tvs.tvs.value.firstOrNull { it.id == id }
 

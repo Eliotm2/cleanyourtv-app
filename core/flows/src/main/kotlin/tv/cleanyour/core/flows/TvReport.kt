@@ -47,9 +47,12 @@ data class AppAbout(val version: String, val flavour: String, val phone: String,
 // word and is not made again until Setup runs again, so after an update that brought the TV a list
 // (or a rule that changed), Manage's report said "blocked WIZARD_STAYS_ON" beside "Profile: exact"
 // and the Home screen page said we did not know the TV. `earlier` tells such a decision.
+// RFC-HELPER-1 (test build): `redirect`, the Home button helper was planned instead of the switch
+// (decision.txt "home=redirect", the report's "Home switch: redirect").
 data class HomeDecision(val planned: Boolean, val block: String? = null, val alreadyOn: Boolean = false,
-                        val app: String? = null, val profile: String? = null) {
+                        val app: String? = null, val profile: String? = null, val redirect: Boolean = false) {
     val line: String get() = when {
+        redirect -> "home switch redirect"
         planned -> "home switch planned"
         block != null -> "home switch blocked $block"
         alreadyOn -> "home switch not needed (the new home screen is on)"
@@ -74,7 +77,8 @@ data class HomeDecision(val planned: Boolean, val block: String? = null, val alr
         val KEEPS_ITS_LINE: Set<HomeBlock> = setOf(HomeBlock.TV_REFUSES, HomeBlock.OLD_ANDROID, HomeBlock.BOOT_LOOP, HomeBlock.CASTING,
             HomeBlock.REMOTE_BUTTONS, HomeBlock.HOME_CHANGED, HomeBlock.VENDOR_HOME)
 
-        fun of(block: HomeBlock, planHasSwitch: Boolean, alreadyOn: Boolean, app: String? = null, profile: String? = null): HomeDecision = when {
+        fun of(block: HomeBlock, planHasSwitch: Boolean, alreadyOn: Boolean, app: String? = null, profile: String? = null, redirect: Boolean = false): HomeDecision = when {
+            redirect -> HomeDecision(false, app = app, profile = profile, redirect = true)
             block != HomeBlock.NONE -> HomeDecision(false, block.name, app = app, profile = profile)
             planHasSwitch -> HomeDecision(true, app = app, profile = profile)
             else -> HomeDecision(false, alreadyOn = alreadyOn, app = app, profile = profile)
@@ -89,6 +93,7 @@ class HomeDecisions(private val store: DocumentStore) {
 
     suspend fun save(id: TvId, d: HomeDecision) {
         val v = when {
+            d.redirect -> "redirect"
             d.planned -> "planned"
             d.block != null -> "blocked:${d.block}"
             d.alreadyOn -> "on"
@@ -110,6 +115,7 @@ class HomeDecisions(private val store: DocumentStore) {
             v == "planned" -> HomeDecision(true)
             v.startsWith("blocked:") -> v.removePrefix("blocked:").takeIf { b -> HomeBlock.entries.any { it.name == b } }?.let { HomeDecision(false, it) }
             v == "on" -> HomeDecision(false, alreadyOn = true)
+            v == "redirect" -> HomeDecision(false, redirect = true)
             v == "none" -> HomeDecision(false)
             else -> null
         }
@@ -126,6 +132,8 @@ data class TvReportInput(
     val switchedOffByApp: Set<PackageName> = emptySet(),
     // beta3: the home decision is an earlier Setup's (HomeDecision.earlier), so the line says so.
     val homeEarlier: Boolean = false,
+    // RFC-HELPER-1 (test build): the Accessibility section (PLAN 4.7); off in a release build.
+    val accessibility: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
 )
 
 object TvReport {
@@ -194,6 +202,36 @@ object TvReport {
         }
     }
 
+    // RFC-HELPER-1 (PLAN 4.7): what the TV says about the Home button helper, from the snapshot's two
+    // settings and the overlay. Other services are only counted, never named, as the person's apps.
+    // Bound or not is not read (no dumpsys accessibility): "listed" and "Switched on" stand for it.
+    private fun StringBuilder.appendAccessibility(s: Snapshot) {
+        val list = tv.cleanyour.core.planner.HomeHelper.list(s)
+        val listed = tv.cleanyour.core.ops.HelperLines.listed(list)
+        val entries = tv.cleanyour.core.ops.HelperLines.entries(list)
+        val others = tv.cleanyour.core.ops.HelperLines.others(list).size
+        val doc = s.launcherOverlay?.let { (tv.cleanyour.core.spec.LauncherConfigCodec.decode(it) as? tv.cleanyour.core.spec.DecodeResult.Ok)?.doc }
+        val redirect = doc?.let { tv.cleanyour.core.spec.HomeHelperKeys.redirectOf(it) }
+        val keyFilter = doc?.let { tv.cleanyour.core.spec.HomeHelperKeys.keyFilterOf(it) }
+        val on = s.settings[tv.cleanyour.core.model.SettingKey.ACCESSIBILITY_ENABLED]
+        appendLine()
+        appendLine("Accessibility")
+        appendLine("Switched on: ${when (on) { "1" -> "yes"; "0" -> "no"; else -> "unknown" }}")
+        appendLine("Services listed: " + when {
+            entries.isEmpty() -> "none"
+            listed -> "${entries.size} (the new home screen's Home button helper, $others other, not named)"
+            else -> "${entries.size} (not named)"
+        })
+        appendLine("Home button helper: " + when {
+            listed && on == "1" -> "listed, accessibility on"
+            listed -> "listed, accessibility off"
+            else -> "not listed"
+        })
+        appendLine("Home redirect: ${redirect?.value ?: "none"}")
+        appendLine("Key filter: ${when (keyFilter) { false -> "off"; true -> "on"; null -> "the launcher's default" }}")
+        appendLine("Button map: ${doc?.appKeys?.size?.takeIf { it > 0 }?.let { "$it buttons" } ?: "none"}")
+    }
+
     private fun StringBuilder.appendHeader(about: AppAbout) {
         appendLine("App: ${v(about.appLine)}")
         appendLine("Phone: ${v(about.phoneLine)}")
@@ -229,6 +267,7 @@ object TvReport {
         )
         if (claimants.isEmpty()) appendLine("Claimants: none")
         for (c in claimants) appendLine("Claimant: ${named(s, c.component)} priority ${c.priority}")
+        if (input.accessibility) appendAccessibility(s)
         val system = s.packages.filter { it.value.system }.toSortedMap(compareBy { it.value })
         val others = s.packages.size - system.size
         appendLine()

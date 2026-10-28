@@ -102,6 +102,8 @@ data class HomeScreenState(
     val lookFailed: Boolean = false,
     // look2 W1: a look send runs with the sheet closed; the Look row reads "Sending..." while busy.
     val lookSending: Boolean = false,
+    // RFC-HELPER-1 (test build): the Home button helper's card, null when nothing of it is on the TV.
+    val helper: HelperCard? = null,
 ) {
     val waiting: Int get() = waitingApps.size
 }
@@ -128,6 +130,7 @@ sealed interface HomeScreenIntent {
     data object UpdateHomeScreen : HomeScreenIntent    // D4
     data object RunSetupAgain : HomeScreenIntent       // 0.3.3 D2, NotOnTv.setupAgain
     data object HelpAddTv : HomeScreenIntent           // 0.3.3 D2, NotOnTv.helpAddTv
+    data object HelperOff : HomeScreenIntent           // RFC-HELPER-1: the helper's "Switch off"
 }
 
 class HomeScreenMachine(
@@ -265,6 +268,7 @@ class HomeScreenMachine(
             HomeScreenIntent.UpdateHomeScreen -> scope.launch { update() }
             HomeScreenIntent.RunSetupAgain -> if (after.notOnTv?.setupAgain == true) effect(ManageEffect.Navigate("setup/${tvId.value}"))
             HomeScreenIntent.HelpAddTv -> if (after.notOnTv?.helpAddTv == true) effect(ManageEffect.Navigate("report/tv/${tvId.value}"))
+            HomeScreenIntent.HelperOff -> if (after.helper?.canSwitchOff == true) scope.launch { helperOff() }
             else -> {}
         }
     }
@@ -315,7 +319,8 @@ class HomeScreenMachine(
             endedLook = ended, pictureId = pictureId, pictures = pictureOptions(),
             ownPicture = own, ownDim = choice?.dim ?: OwnPicture.DEFAULT_DIM,
             waitingApps = waiting, earlierPicture = earlierLook?.photo?.ref, sent = sentPreview, sentStyle = drafts.styleOf(choice, tvLook),
-            sentPicture = drafts.pictureIdOf(choice, tvLook), launcherVersionCode = versionCode, ramMb = ramMb, hasInputs = hasInputs),
+            sentPicture = drafts.pictureIdOf(choice, tvLook), launcherVersionCode = versionCode, ramMb = ramMb, hasInputs = hasInputs,
+            helper = HomeHelperFlows.card(snap, d.homeHelper)),
             choice, earlierLook, cardsNow, keys))
     }
 
@@ -462,7 +467,8 @@ class HomeScreenMachine(
         val lookPicture = if (sendsNew) LookPicture.Of(photo!!.ref, photo.dim)
             else OwnPicture.lookPicture(d, tvId, pictureId.takeUnless { it == LookPicture.NEW_ID }, dim)
         val override = drafts.override(themeId, columns)
-        val look = attempt { Look.encode(d.encoder, d.blobs, theme(themeId), dock, cards, lookPicture, override) }.getOrNull()
+        val carry = HomeHelperFlows.carry(d, tvId)
+        val look = attempt { Look.encode(d.encoder, d.blobs, theme(themeId), dock, cards, lookPicture, override, carry) }.getOrNull()
             ?: return effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false))
         val kept = DockLayers.keep(dock)
         val r = writer.write(tvId, PlanRequest.ApplyTheme(look.doc, look.config, look.wallpaper)) { send(BusyNow(it)) }
@@ -500,7 +506,8 @@ class HomeScreenMachine(
         val cards = Cards.current(d, tvId, choice)
         val tv = lookTv(state.value)
         val own = attempt { OwnPicture.ref(d, tvId) }.getOrNull()
-        val look = attempt { val (doc, w) = drafts.docOf(choice, dock, cards, own, tv); Look.encode(d.encoder, d.blobs, doc, w) }.getOrNull()
+        val carry = HomeHelperFlows.carry(d, tvId)
+        val look = attempt { val (doc, w) = drafts.docOf(choice, dock, cards, own, tv); Look.encode(d.encoder, d.blobs, carry(doc), w) }.getOrNull()
             ?: return effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false))
         val r = writer.write(tvId, PlanRequest.ApplyTheme(look.doc, look.config, look.wallpaper)) { send(BusyNow(it)) }
         send(BusyNow(null))
@@ -531,7 +538,8 @@ class HomeScreenMachine(
             else null
         val sendsPhoto = photo ?: earlierPhoto
         val ctx = lookContext(at).copy(cards = cards)
-        val look = attempt { val (doc, w) = drafts.docOf(draft, dock, cards, ctx); Look.encode(d.encoder, d.blobs, doc, w) }.getOrNull()
+        val carry = HomeHelperFlows.carry(d, tvId)
+        val look = attempt { val (doc, w) = drafts.docOf(draft, dock, cards, ctx); Look.encode(d.encoder, d.blobs, carry(doc), w) }.getOrNull()
         if (look == null || (draft.newPhoto && sendsPhoto == null)) { send(LookResult(false)); return }
         val r = writer.write(tvId, PlanRequest.ApplyTheme(look.doc, look.config, look.wallpaper)) { send(BusyNow(it)) }
         send(BusyNow(null))
@@ -565,6 +573,16 @@ class HomeScreenMachine(
         if (r is WriteResult.Paused) { this.kept = null; send(LookResult(true)); return }   // the open-run card (O2)
         if (r is WriteResult.Refused && state.value.notOnTv != null) { this.kept = null; send(LookResult(true)); return }
         send(LookResult(false))
+    }
+
+    // RFC-HELPER-1: "Switch off" of the Home button helper: our HomeKeyService out of the list, every
+    // other service as it was (PLAN 4.4). Switching it on again is Setup's, with its consent.
+    private suspend fun helperOff() {
+        val r = writer.write(tvId, PlanRequest.HomeHelperOff) { send(BusyNow(it)) }
+        send(BusyNow(null))
+        if (r is WriteResult.Done) effect(ManageEffect.Snackbar(SnackKind.HOME_SAVED, "", false))
+        else if (r !is WriteResult.GateCancelled && r !is WriteResult.NoTv && r !is WriteResult.Paused) effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false))
+        load()
     }
 
     // "Use the TV's own home screen": re-enables the stock launcher, sets it as home, keeps ours

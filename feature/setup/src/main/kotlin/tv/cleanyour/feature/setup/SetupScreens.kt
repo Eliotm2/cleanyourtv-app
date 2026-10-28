@@ -395,6 +395,7 @@ internal fun ColumnScope.CustomiseContent(
             )
         }
     }
+    HomeHelperGroup(extras, actions)   // RFC-HELPER-1 (test build)
     Overline(stringResource(R.string.customise_group_afterwards), Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp))
     ListGroup {
         SwitchRow(

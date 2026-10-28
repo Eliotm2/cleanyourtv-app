@@ -36,10 +36,11 @@ import tv.cleanyour.core.store.BlobStore
 // the frozen 0.4.0 path (LegacyLook) byte for byte until the next send.
 internal class Look(val doc: LauncherConfigDoc, val digest: Sha256, val config: BlobRef, val wallpaper: BlobRef?) {
     companion object {
+        // RFC-HELPER-1: `carry` keeps the Home button helper's keys of the TV (HomeHelperFlows.carry).
         suspend fun encode(encoder: ConfigEncoder, blobs: BlobStore, theme: Theme?, dock: List<PackageName>, cards: Boolean, picture: LookPicture? = null,
-            columns: Int? = null): Look {
+            columns: Int? = null, carry: (LauncherConfigDoc) -> LauncherConfigDoc = { it }): Look {
             val (doc, wallpaper) = docOf(theme, dock, cards, picture, columns)
-            return encode(encoder, blobs, doc, wallpaper)
+            return encode(encoder, blobs, carry(doc), wallpaper)
         }
 
         // A doc and its wallpaper as the push sends them, encoded and stored.
