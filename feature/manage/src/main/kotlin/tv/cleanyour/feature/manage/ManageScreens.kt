@@ -132,11 +132,17 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
                 onClick = { onIntent(ManageIntent.RefreshThumbnail) },
             )
             // Navigation into the wizard, whose own "Make it clean" is the guarded action (R5-W8 O1).
+            // 0.4.7 (PM 11): "Run Setup again" stays visible for every TV, the one name for the way back in.
             if (!tv.clean) PrimaryButton(stringResource(R.string.manage_clean_again), { onIntent(ManageIntent.CleanAgain) }, Modifier.padding(top = 16.dp), guardObscured = false)
+            else SecondaryButton(stringResource(R.string.manage_clean_again), { onIntent(ManageIntent.CleanAgain) }, Modifier.padding(top = 16.dp))
             // 0.3.2 B1: an unlisted TV (no exact profile) invites the person to help add it.
+            // 0.4.7 (must 4): once its report was sent, the banner says when and that the issue is
+            // where news comes; sending again stays one tap away.
             if (tv.helpAddTv) {
-                Banner(stringResource(R.string.manage_help_add_tv_banner), BannerTone.INFO, Modifier.padding(top = 16.dp),
-                    actionLabel = stringResource(R.string.manage_help_add_tv), onAction = { onIntent(ManageIntent.HelpAddTv) })
+                val sent = tv.reportSentAtMs
+                Banner(if (sent != null) msg(R.string.manage_report_sent_banner, "date" to shortDate(sent, locale)) else stringResource(R.string.manage_help_add_tv_banner),
+                    BannerTone.INFO, Modifier.padding(top = 16.dp),
+                    actionLabel = stringResource(if (sent != null) R.string.manage_send_again else R.string.manage_help_add_tv), onAction = { onIntent(ManageIntent.HelpAddTv) })
             }
             // 0.4.6: on this connect a setup wizard claims Home while the TV's own home screen is off
             // (WizardHome). The way back sits above the rows, like the drift banner's "Restore mine";
@@ -154,13 +160,20 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
             }
             ListGroup(Modifier.padding(top = 16.dp)) {
                 // 0.3.3 D2: without the new home screen there is no dock to name; the row opens the reason.
+                // 0.4.7 (UX finding 8): installed but not in use says the TV's own is in use.
                 ListRow(stringResource(R.string.manage_row_home),
-                    subtitle = if (tv.ownHome) stringResource(R.string.manage_row_home_own) else tv.dockNames.joinToString(", ").ifEmpty { null },
+                    subtitle = when {
+                        tv.ownHome -> stringResource(R.string.manage_row_home_own)
+                        tv.homeInstalledNotInUse -> stringResource(R.string.manage_row_home_not_in_use)
+                        else -> tv.dockNames.joinToString(", ").ifEmpty { null }
+                    },
                     onClick = { onIntent(ManageIntent.Open(ManageSection.HOME_SCREEN)) })
                 ListDivider()
                 // STORES-PLAN 1: the Play build has no add-ons, so no row that leads to them.
+                // UX finding 9: without the new home screen a card shows as an app, and the row says so.
                 if (state.addOns) {
-                    ListRow(stringResource(R.string.manage_row_cards), onClick = { onIntent(ManageIntent.Open(ManageSection.MODULES)) })
+                    ListRow(stringResource(R.string.manage_row_cards), subtitle = if (tv.ownHome || tv.homeInstalledNotInUse) stringResource(R.string.manage_row_cards_own_home) else null,
+                        onClick = { onIntent(ManageIntent.Open(ManageSection.MODULES)) })
                     ListDivider()
                 }
                 // WP4 (C6): what the list for this TV now keeps on, as one line into Switched off.
@@ -244,8 +257,27 @@ internal fun ColumnScope.OpenWriteContent(
         else -> stringResource(R.string.openwrite_body)
     }
     val title = msg(if (stale) R.string.openwrite_title_stale else R.string.openwrite_title, "tv" to open.tvName)
+    // 0.4.7 (UX finding 19): a look that did not reach the TV (an ApplyTheme run paused, not STALE)
+    // says so by name, with "Send it again" and "Undo".
+    val look = !setup && !stale && open.kind == PlanKind.THEME && open.tookHome == null
     Gap(8.dp)
-    if (setup) {
+    if (look) {
+        var asking by rememberSaveable(open.planId.value) { mutableStateOf(initiallyAsking) }
+        val pending = asking
+        val question = pending?.let { Confirmations.forOpenWrite(it) }
+        if (pending != null && question != null && !open.busy) {
+            ConfirmQuestionFor(question, onConfirm = { asking = null; onAction(pending) }, onCancel = { asking = null })
+            return
+        }
+        fun act(a: OpenWriteAction) { if (Confirmations.forOpenWrite(a) != null) asking = a else onAction(a) }
+        val lookTitle = msg(R.string.openwrite_title_look, "tv" to open.tvName)
+        StopCard(lookTitle, if (open.notTaken) stringResource(R.string.openwrite_not_taken) else stringResource(R.string.openwrite_body_look),
+            primaryLabel = if (open.busy) null else stringResource(R.string.openwrite_send_again), onPrimary = { act(OpenWriteAction.CARRY_ON) },
+            secondaryLabel = if (open.busy) null else stringResource(R.string.action_undo), onSecondary = { act(OpenWriteAction.UNDO) },
+            tertiaryLabel = if (open.busy) null else stringResource(R.string.openwrite_stop), onTertiary = { act(OpenWriteAction.STOP_HERE) },
+            detailsLabel = if (open.busy) null else stringResource(R.string.openwrite_report), onDetails = { onReport(lookTitle) },
+            busyText = if (open.busy) stringResource(R.string.openwrite_busy) else null)
+    } else if (setup) {
         StopCard(title, body,
             primaryLabel = stringResource(R.string.openwrite_open_setup), onPrimary = onOpenSetup,
             tertiaryLabel = stringResource(R.string.openwrite_later), onTertiary = onDismiss,

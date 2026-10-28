@@ -38,6 +38,10 @@ data class AppChoice(val pkg: PackageName, val name: String)
 // `helpAddTv`: a list for this TV is what is missing; "Help add this TV" makes its report.
 // `earlier` (beta3): an earlier Setup decided it, with another version or list (HomeDecision.earlier),
 // so the screen says that instead of a reason that may no longer hold, and offers Setup again.
+// `installed` (0.4.7, UX finding 8): the new home screen is on the TV but not in use (the switch was
+// tried and the TV's own home screen is back, or the person chose the TV's own): "Try the switch
+// again" runs Setup again; the dock and the look wait until it is in use.
+// `reportSentAtMs` (0.4.7): this TV's report was sent then (SentReports), for the next step's line.
 data class NotOnTv(
     val reason: HomeBlock?,
     val brand: String,
@@ -46,6 +50,8 @@ data class NotOnTv(
     val setupAgain: Boolean = false,
     val helpAddTv: Boolean = false,
     val earlier: Boolean = false,
+    val installed: Boolean = false,
+    val reportSentAtMs: Long? = null,
 )
 
 // 0.4.0: a picture of the Picture row: a gallery picture by id, with its file for the thumbnail
@@ -330,7 +336,20 @@ class HomeScreenMachine(
         if (tv.launcher != null || snap == null) return null
         val decision = attempt { d.homeDecisions.load(tvId) }.getOrNull()
         val reason = decision?.block?.let { b -> HomeBlock.entries.firstOrNull { it.name == b } }
-        if (Launcher.pkg in snap.packages && reason != HomeBlock.HOME_CHANGED) return null
+        val brand = LogCodes.clean(snap.facts.brand, 40).ifEmpty { tv.nickname }
+        val sent = attempt { d.sentReports.load(tvId) }.getOrNull()?.atMs
+        val ours = snap.packages[Launcher.pkg]
+        if (ours != null && reason != HomeBlock.HOME_CHANGED) {
+            // 0.4.7 (UX finding 8): the switch was planned (or nothing was recorded), our launcher is
+            // on the TV with our key (or one the probe could not read), and Home does not answer to
+            // it: installed, not in use. A launcher under our name with another key, one that is Home
+            // (a re-run on a TV already ours), or one left under a block Setup recorded keeps the rows.
+            if (reason != null) return null
+            val pin = runCatching { d.launcherPin.bundled() }.getOrNull()
+            val mine = ours.signer == null || pin == null || ours.signer == pin.signer
+            val inUse = decision?.alreadyOn == true || snap.home.resolved?.pkg == Launcher.pkg
+            return if (mine && !inUse) NotOnTv(reason = null, brand = brand, setupAgain = true, installed = true, reportSentAtMs = sent) else null
+        }
         // beta3 (issues #701, #1273): a block an earlier Setup decided, with an earlier version of
         // the app or another list than the TV resolves to now, may not hold any more: Setup again
         // decides it with this version. The TV's own facts (it refuses other home screens, its
@@ -340,8 +359,7 @@ class HomeScreenMachine(
         val now = attempt { d.profiles.resolveFor(snap) }.getOrNull()
         val earlier = reason != null && decision?.earlier(d.about.version, now) == true
         val unlisted = tv.profileId == null && (!earlier || now !is ProfileResolution.Exact)
-        if (earlier) return NotOnTv(reason = reason, brand = LogCodes.clean(snap.facts.brand, 40).ifEmpty { tv.nickname },
-            unlisted = unlisted, setupAgain = true, earlier = true)
+        if (earlier) return NotOnTv(reason = reason, brand = brand, unlisted = unlisted, setupAgain = true, earlier = true, reportSentAtMs = sent)
         val setupAgain = when (reason) {
             null, HomeBlock.NONE, HomeBlock.WIZARD_WIFI_UNKNOWN -> true
             // Issue #8: the person can make the TV's own home screen Home again, and on a TV an exact
@@ -356,11 +374,11 @@ class HomeScreenMachine(
             HomeBlock.PATCHWALL_FEEDS -> true
             else -> false
         }
-        val needsList = reason == HomeBlock.UNKNOWN_HOME || reason == HomeBlock.WIZARD_STAYS_ON || (reason == HomeBlock.WIZARD_WIFI && unlisted)
+        val needsList = reason != null && HomeKept.needsList(reason, unlisted)
         return NotOnTv(
-            reason = reason, brand = LogCodes.clean(snap.facts.brand, 40).ifEmpty { tv.nickname },
+            reason = reason, brand = brand,
             fireTv = reason == HomeBlock.TV_REFUSES && FireOs.isFireOs(snap.facts, snap), unlisted = unlisted,
-            setupAgain = setupAgain, helpAddTv = needsList && unlisted,
+            setupAgain = setupAgain, helpAddTv = needsList && unlisted, reportSentAtMs = sent,
         )
     }
 
@@ -562,7 +580,9 @@ class HomeScreenMachine(
             return
         }
         load()
-        if (r is WriteResult.Paused) { this.kept = null; send(LookResult(true)); return }   // the open-run card (O2)
+        // UX finding 19: a paused send (the open-run card, O2) did not reach the TV either; the draft
+        // and the photo stay, so the look is not lost while the card is dealt with.
+        if (r is WriteResult.Paused) { send(LookResult(false)); return }
         if (r is WriteResult.Refused && state.value.notOnTv != null) { this.kept = null; send(LookResult(true)); return }
         send(LookResult(false))
     }

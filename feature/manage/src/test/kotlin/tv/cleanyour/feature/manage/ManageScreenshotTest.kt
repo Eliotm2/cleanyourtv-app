@@ -24,6 +24,7 @@ import tv.cleanyour.core.flows.LeftoversState
 import tv.cleanyour.core.flows.ManageState
 import tv.cleanyour.core.flows.ReportKind
 import tv.cleanyour.core.flows.ReportState
+import tv.cleanyour.core.flows.SentReport
 import tv.cleanyour.core.flows.OffGroup
 import tv.cleanyour.core.flows.OffRow
 import tv.cleanyour.core.flows.OpenWrite
@@ -202,6 +203,9 @@ object ManageShots {
         Shot("manage_help_add_tv", tall) { ManageScreen(manage(card().copy(helpAddTv = true)), {}) },
         // 0.3.3 D2 (issue #3): the new home screen isn't on this TV; the Home screen row says so.
         Shot("manage_own_home", tall) { ManageScreen(manage(card().copy(helpAddTv = true, ownHome = true, dockNames = emptyList())), {}) },
+        // 0.4.7 (UX finding 8): the new home screen installed but not in use; (must 4) the report sent before.
+        Shot("manage_home_not_in_use", tall) { ManageScreen(manage(card().copy(homeInstalledNotInUse = true, dockNames = emptyList())), {}) },
+        Shot("manage_report_sent", tall) { ManageScreen(manage(card().copy(helpAddTv = true, ownHome = true, dockNames = emptyList(), reportSentAtMs = NOW - 86_400_000)), {}) },
         // WP4 (C6): one line for the apps the list for this TV now keeps on.
         Shot("manage_better_back_on", tall) { ManageScreen(manage(card().copy(betterBackOn = 2)), {}) },
         // 0.4.6: a setup wizard claims Home under the new home screen; the way back, and while it runs.
@@ -217,6 +221,9 @@ object ManageShots {
         Shot("report_problem", tall) { ReportScreen(report(ReportKind.PROBLEM), {}, {}) },
         // 0.3.3 D1: too long for the link, so the screen says it copies the report for the paste.
         Shot("report_tv_too_long", tall) { ReportScreen(report(ReportKind.TV, inLink = false), {}, {}) },
+        // 0.4.7 (must 4): the report sent before, without and with the issue's link.
+        Shot("report_tv_sent", tall) { ReportScreen(report(ReportKind.TV).copy(sent = SentReport(NOW - 86_400_000)), {}, {}) },
+        Shot("report_tv_sent_issue", tall) { ReportScreen(report(ReportKind.TV).copy(sent = SentReport(NOW - 86_400_000, "https://github.com/udhaykumarbala/cleanyourtv-app/issues/1368")), {}, {}) },
         Shot("report_loading") { ReportScreen(ReportState(ReportKind.TV), {}, {}) },
         Shot("report_unavailable") { ReportScreen(ReportState(ReportKind.TV, loading = false, available = false), {}, {}) },
 
@@ -235,6 +242,8 @@ object ManageShots {
         // QA of 0.4.5: the TV changed after we read it (STALE): before any step, and partway through.
         Shot("openwrite_stale_nothing_done") { SheetOver({ ManageScreen(manage(), {}) }) { OpenWriteContent(openWrite(kind = PlanKind.THEME, reason = PauseReason.STALE, nothingDone = true), {}, {}, {}) } },
         Shot("openwrite_stale_partway") { SheetOver({ ManageScreen(manage(), {}) }) { OpenWriteContent(openWrite(kind = PlanKind.THEME, reason = PauseReason.STALE), {}, {}, {}) } },
+        // 0.4.7 (UX finding 19): a look send that paused: "Your look didn't reach the TV", Send it again, Undo.
+        Shot("openwrite_look_failed") { SheetOver({ ManageScreen(manage(), {}) }) { OpenWriteContent(openWrite(kind = PlanKind.THEME, reason = PauseReason.STEP_FAILED), {}, {}, {}) } },
         // 0.4.6: the app a put back switched on took the Home button.
         Shot("openwrite_took_home") { SheetOver({ ManageScreen(manage(), {}) }) { OpenWriteContent(openWrite(kind = PlanKind.PUT_BACK, reason = PauseReason.STEP_FAILED, tookHome = "Android TV Home"), {}, {}, {}) } },
         Shot("openwrite_setup") { SheetOver({ ManageScreen(manage(), {}) }) { OpenWriteContent(openWrite(kind = PlanKind.SETUP), {}, {}, {}) } },

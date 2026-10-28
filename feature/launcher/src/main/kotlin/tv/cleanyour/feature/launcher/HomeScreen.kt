@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import tv.cleanyour.core.flows.AppChoice
@@ -30,6 +31,7 @@ import tv.cleanyour.core.flows.Busy
 import tv.cleanyour.core.flows.HomeScreenIntent
 import tv.cleanyour.core.flows.HomeScreenState
 import tv.cleanyour.core.flows.HomeBlock
+import tv.cleanyour.core.flows.IssueLinks
 import tv.cleanyour.core.flows.NotOnTv
 import tv.cleanyour.core.model.PackageName
 import tv.cleanyour.core.planner.Plan
@@ -44,6 +46,7 @@ import tv.cleanyour.ui.design.component.DockApp
 import tv.cleanyour.ui.design.component.DockEditor
 import tv.cleanyour.ui.design.component.DockEditorState
 import tv.cleanyour.ui.design.component.Lead
+import tv.cleanyour.ui.design.component.LinkRow
 import tv.cleanyour.ui.design.component.ListDivider
 import tv.cleanyour.ui.design.component.ListGroup
 import tv.cleanyour.ui.design.component.ListRow
@@ -55,6 +58,7 @@ import tv.cleanyour.ui.design.component.ScreenTitle
 import tv.cleanyour.ui.design.component.SheetHeader
 import tv.cleanyour.ui.design.component.TertiaryButton
 import tv.cleanyour.ui.design.icon.CytIcons
+import tv.cleanyour.ui.design.theme.CytTheme
 import tv.cleanyour.ui.design.theme.Glow
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -71,12 +75,13 @@ import tv.cleanyour.ui.design.component.toTvLook
 // composable, so the screenshot tests can draw it on SheetSurface.
 @Composable
 // 0.4.6: `onReport` opens the prefilled GitHub form from the not-on-this-TV screen, with its lead.
+// 0.4.7: `onOpenUrl` opens the TV list page from the not-on-this-TV screen (the browser opens it).
 fun HomeScreen(
     state: HomeScreenState, onIntent: (HomeScreenIntent) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier, photos: PhotoPicker? = null,
-    onReport: (String) -> Unit = {},
+    onReport: (String) -> Unit = {}, onOpenUrl: (String) -> Unit = {},
 ) {
     val notOnTv = state.notOnTv
-    if (notOnTv != null) { NotOnTvScreen(state.tvName, notOnTv, onIntent, onBack, modifier, onReport); return }
+    if (notOnTv != null) { NotOnTvScreen(state.tvName, notOnTv, onIntent, onBack, modifier, onReport, onOpenUrl); return }
     var dockOpen by rememberSaveable { mutableStateOf(false) }
     val busy = state.busy
     ScreenScaffold(Glow.Tv, modifier, topBar = { CytTopBar(onBack = onBack) }) {
@@ -153,9 +158,18 @@ fun HomeScreen(
 // Both buttons only navigate; nothing here writes to the TV.
 // 0.4.6: without "Help add this TV" (a list is not what is missing), "Report a problem" opens the
 // GitHub form with why, so a block that should not be there reaches us with the TV's report.
+// 0.4.7 (UX finding 8): the new home screen installed but not in use leads with that and offers
+// "Try the switch again"; the dock and the look wait. (PM 6): a decision Setup made on purpose says
+// so before "Report a problem", with the TV list page, so a designed outcome is not filed as a bug.
+// (must 4): a report sent before says when, and that we post in the issue.
 @Composable
-internal fun NotOnTvScreen(tvName: String, n: NotOnTv, onIntent: (HomeScreenIntent) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier, onReport: (String) -> Unit = {}) {
+internal fun NotOnTvScreen(
+    tvName: String, n: NotOnTv, onIntent: (HomeScreenIntent) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier, onReport: (String) -> Unit = {},
+    onOpenUrl: (String) -> Unit = {},
+) {
+    val locale = LocalConfiguration.current.locales[0]
     val action = when {
+        n.installed -> R.string.home_try_switch_again to HomeScreenIntent.RunSetupAgain
         n.setupAgain -> R.string.home_run_setup_again to HomeScreenIntent.RunSetupAgain
         n.helpAddTv -> R.string.home_help_add_tv to HomeScreenIntent.HelpAddTv
         else -> null
@@ -168,6 +182,18 @@ internal fun NotOnTvScreen(tvName: String, n: NotOnTv, onIntent: (HomeScreenInte
         }),
     ) {
         ScreenTitle(stringResource(R.string.home_title), Modifier.padding(top = 20.dp))
+        if (n.installed) {
+            val lead = stringResource(R.string.home_installed_lead)
+            Lead(lead, Modifier.padding(top = 12.dp))
+            Body(stringResource(R.string.home_installed_body), Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp))
+            ListGroup(Modifier.padding(top = 20.dp)) {
+                ListRow(stringResource(R.string.home_row_dock), subtitle = stringResource(R.string.home_installed_rows_note))
+                ListDivider()
+                ListRow(stringResource(R.string.home_row_look), subtitle = stringResource(R.string.home_installed_rows_note))
+            }
+            TertiaryButton(stringResource(R.string.home_report), { onReport(lead) }, Modifier.padding(top = 8.dp))
+            return@ScreenScaffold
+        }
         val lead = msg(R.string.home_not_on_tv_lead, "tv" to tvName)
         Lead(lead, Modifier.padding(top = 12.dp))
         // beta3: an earlier Setup's block may not hold with this version (issues #701, #1273).
@@ -200,9 +226,19 @@ internal fun NotOnTvScreen(tvName: String, n: NotOnTv, onIntent: (HomeScreenInte
             else -> R.string.home_not_on_tv_next_setup
         }
         next?.let { Body(stringResource(it), Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp)) }
-        if (!n.helpAddTv) TertiaryButton(stringResource(R.string.home_report), { onReport(lead) }, Modifier.padding(top = 8.dp))
+        // The report sent before (SentReports): when, and that the issue is where news comes.
+        n.reportSentAtMs?.let { Body(msg(R.string.home_report_sent, "date" to shortDate(it, locale)), Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp), color = CytTheme.colors.textPrimary) }
+        // A designed outcome (a reason Setup recorded, not an earlier version's) is not a fault: say
+        // so, and where the TV list says what each TV gets, before offering the problem form.
+        if (!n.helpAddTv && !n.earlier && n.reason != null && n.reason != HomeBlock.NONE) {
+            Body(stringResource(R.string.home_by_design), Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp))
+        }
+        LinkRow(stringResource(R.string.home_tv_list), { onOpenUrl(IssueLinks.TV_LIST) }, Modifier.padding(top = 8.dp))
+        if (!n.helpAddTv) TertiaryButton(stringResource(R.string.home_report), { onReport(lead) }, Modifier.padding(top = 4.dp))
     }
 }
+
+internal fun shortDate(ms: Long, locale: java.util.Locale): String = java.text.SimpleDateFormat("d MMM", locale).format(java.util.Date(ms))
 
 @Composable
 internal fun ColumnScope.StockPreviewContent(plan: Plan, onIntent: (HomeScreenIntent) -> Unit) {

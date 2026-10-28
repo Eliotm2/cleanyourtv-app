@@ -33,14 +33,19 @@
     <string name="manage_checked">Checked {date}</string>
     <string name="manage_tv_card_cd">{tv}. {state}. {checked}</string>
     <string name="manage_thumbnail_cd">The last picture from {tv}. Tap to refresh.</string>
-    <string name="manage_clean_again">Clean it up again</string>
+    <!-- 0.4.7 (UX finding 20, PM 11): the one name for the way back into Setup, shown for every TV -->
+    <string name="manage_clean_again">Run Setup again</string>
     <string name="manage_level_simple">Simple</string>
     <string name="manage_level_custom">Custom</string>
     <string name="manage_level_simple_note">Switches off the usual clutter and keeps everything else.</string>
-    <string name="manage_level_custom_note">Lets you choose each item, the dock and the look.</string>
+    <string name="manage_level_custom_note">Lets you choose each item yourself.</string>
     <string name="manage_row_home">Home screen</string>
     <string name="manage_row_home_own">The TV keeps its own. See why</string>
+    <!-- 0.4.7 (UX finding 8): the new home screen is installed but not in use -->
+    <string name="manage_row_home_not_in_use">The TV\'s own is in use</string>
     <string name="manage_row_cards">Cards and modules</string>
+    <!-- 0.4.7 (UX finding 9): a card installs as an app while the TV keeps its own home screen -->
+    <string name="manage_row_cards_own_home">Shown as apps: this TV keeps its own home screen</string>
     <string name="manage_row_cards_none">No cards yet</string>
     <string name="manage_row_switched_off">{count, plural, other {Switched off (#)}}</string>
     <string name="manage_row_switched_off_sub">Put any of them back</string>
@@ -83,6 +88,10 @@
     <string name="openwrite_body_took_home">Once {app} was back on, the TV gave it the Home button, so Home no longer opens the new home screen. Switch {app} off again to get the new one back, or keep it.</string>
     <string name="openwrite_switch_off_again">Switch it off again</string>
     <string name="openwrite_keep_it">Keep it</string>
+    <!-- 0.4.7 (UX finding 19): a look send that paused did not reach the TV -->
+    <string name="openwrite_title_look">Your look didn\'t reach {tv}</string>
+    <string name="openwrite_body_look">Nothing else changed. Send it again, or undo to keep the look the TV had. Until then nothing else can change on this TV.</string>
+    <string name="openwrite_send_again">Send it again</string>
 
     <!-- M4 Switched off -->
     <string name="switchedoff_title">{count, plural, other {Switched off (#)}}</string>
@@ -190,6 +199,9 @@
     <!-- 0.3.2 B1: an unlisted TV on Manage -->
     <string name="manage_help_add_tv_banner">We haven\'t met this exact TV before, so we were careful with it. A short report from you helps us add it.</string>
     <string name="manage_help_add_tv">Help add this TV</string>
+    <!-- 0.4.7 (must 4): the report sent before (SentReports) -->
+    <string name="manage_report_sent_banner">You sent this TV\'s report on {date}. We\'ll post in your issue when there\'s news.</string>
+    <string name="manage_send_again">Send again</string>
     <string name="manage_wizard_home_title">The setup wizard can take the Home button</string>
     <string name="manage_wizard_home_body">Switch the TV\'s own home screen back on so the TV keeps starting normally.</string>
     <string name="manage_wizard_home_button">Switch it back on</string>
@@ -213,4 +225,12 @@
     <string name="report_share">Share</string>
     <string name="report_loading">Making the report</string>
     <string name="report_unavailable">We need to read this TV once before we can make its report. Set it up or connect to it, then try again.</string>
+    <!-- 0.4.7 (must 4): the TV report was sent before; the issue link once pasted -->
+    <string name="report_sent_line">You sent this TV\'s report on {date}. We\'ll post in your issue when there\'s news. You can send it again.</string>
+    <string name="report_sent_issue">Your issue: {issue}. Open it to see the news.</string>
+    <string name="report_issue_label">Your issue\'s link (optional)</string>
+    <string name="report_issue_hint">Paste the link of the issue the report went to, and we\'ll remember it here.</string>
+    <string name="report_issue_error">That isn\'t a link to an issue of this app on GitHub.</string>
+    <string name="report_issue_save">Remember it</string>
+    <string name="report_issue_open">Open the issue</string>
 </resources>
