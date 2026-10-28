@@ -45,10 +45,6 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   and "Undo".
 - Setup's Customise names the look you picked ("Classic with your photo", "Glass with Mist")
   instead of "Look: Default".
-- A TV that got a new address on your Wi-Fi (a mesh network, a new router) is found again: when
-  its saved address does not answer, the app looks for it on the network, checks it is the same
-  TV with the key it already allowed, and saves the new address. No other TV is connected, and
-  none shows an Allow prompt.
 - When the TV turns its own home screen back on behind the app (the XGIMI MoGo 3 Pro does on some
   remote buttons), Manage's Home screen row says so with "Run Setup again" first, and a problem
   report has the line.
@@ -78,6 +74,14 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   What we found, Customise, Done, Manage and the Home screen page say so instead of "the TV keeps
   its own home screen", and the helper's Switch off replaces "Use the TV's own home screen". Its
   look goes through the launcher's ThemeProvider where the look does.
+
+## 0.4.6.1 (2026-10-28)
+
+- A TV that got a new address on your Wi-Fi (after a TV update, a mesh network or a new router)
+  is found again: when its saved address does not answer, the app looks for it on the network,
+  checks it is the same TV with the key it already allowed, and saves the new address. Before,
+  the app waited at "Waiting for the TV..." for good. No other TV is connected, and none shows
+  an Allow prompt.
 
 ## 0.4.6 (2026-10-28)
 
