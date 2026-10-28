@@ -128,6 +128,8 @@ class ManageDeps(
     val log: FlowLog = FlowLog { },
     // 0.4.7: what each TV's last connect read (StockHomeBack), for Manage's card and the problem report.
     val stockHomeBacks: StockHomeBack.Reads = StockHomeBack.Reads(),
+    // RFC-HELPER-1: whether this build shows the Home button helper (the test build's bundled switch).
+    val homeHelper: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
 ) {
     fun tv(id: TvId): Tv? = tvs.tvs.value.firstOrNull { it.id == id }
 

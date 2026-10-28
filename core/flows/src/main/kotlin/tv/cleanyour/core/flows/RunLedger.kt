@@ -207,7 +207,7 @@ class RunLedger(private val store: DocumentStore, private val journal: Journal) 
 
     companion object {
         // Step R's ops whose failure means the TV's own home screen is not back (the engine's rule).
-        private fun mustSucceed(op: Op): Boolean = op is Op.Enable || op is Op.SetHome || op is Op.VerifyHome
+        private fun mustSucceed(op: Op): Boolean = op is Op.Enable || op is Op.SetHome || op is Op.VerifyHome || op is Op.AccessibilityRemove
 
         fun isChange(op: Op): Boolean = when (op) {
             is Op.Read, is Op.VerifyHome, is Op.Settle, Op.PressHome, is Op.CurtainCue -> false

@@ -69,6 +69,7 @@ sealed interface SetupIntent { data object Start : SetupIntent; data class PickT
     data object Restart : SetupIntent; data object SaveRestoreNote : SetupIntent; data object AddCard : SetupIntent; data object Finish : SetupIntent
     data class StopAction(val action: tv.cleanyour.core.flows.StopAction) : SetupIntent; data object RejectIdentity : SetupIntent   // RFC-W8-1 (accepted)
     data class ShowOnTv(val on: Boolean) : SetupIntent   // RFC-CURTAIN-1: the Customise switch "Show the progress on the TV"
+    data class HomeHelper(val on: Boolean) : SetupIntent   // RFC-HELPER-1 (test build): the Customise switch "Home button helper", on only after its consent
     // RFC-LOOK-SETUP-1 (0.4.0): the look step has the Look sheet's choices. Apps in a row (4 to 8,
     // anything else is ignored), the picture (HomeChoice.picture, null for the look's own), and a
     // photo the phone just made (16:9, a JPEG of at most 280 KB) with its dim. They only change the

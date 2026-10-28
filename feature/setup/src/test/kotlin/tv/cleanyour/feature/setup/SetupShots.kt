@@ -484,6 +484,14 @@ object SetupShots {
             }
         },
         Shot("customise_why_sheet_kept") { SheetFrame({ Setup(found(keptPlan), keptExtras) }, maxHeight = 420.dp) { WhyContent(found(keptPlan), keptExtras) } },
+        // RFC-HELPER-1 (test build): Customise's Home button helper, switched on, and its consent.
+        Shot("customise_sheet_helper") {
+            SheetFrame({ Setup(found(homeSwitchOnlyPlan)) }) {
+                CustomiseContent(found(homeSwitchOnlyPlan), customising.copy(dock = emptyList(), helperOffer = true, helperOn = true),
+                    NoSetupActions, rememberUndoSnackbarState(), {}, {}, initiallyOpen = emptyList())
+            }
+        },
+        Shot("customise_helper_consent") { SheetFrame({ Setup(found()) }) { HomeHelperConsent({}, {}) } },
 
         // S3b Your dock, with room and full; the look picker
         Shot("dock_sheet") { SheetFrame({ Setup(found()) }) { DockContent(dockState(dockApps.take(3)), dockApps + otherApps, {}) } },

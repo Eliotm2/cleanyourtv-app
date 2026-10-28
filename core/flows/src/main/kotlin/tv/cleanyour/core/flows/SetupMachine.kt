@@ -1,5 +1,7 @@
 package tv.cleanyour.core.flows
 
+import tv.cleanyour.core.planner.HomeHelper
+import tv.cleanyour.core.spec.HomeHelperKeys
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
@@ -189,6 +191,10 @@ data class SetupExtras(
     val newPicture: BlobRef? = null,
     val newDim: Int = OwnPicture.DEFAULT_DIM,
     val waiting: Int = 0,
+    // RFC-HELPER-1 (test build): Customise offers "Home button helper" on this TV (HomeHelper's rules
+    // hold, the TV's own home screen is Google's), and the plan on screen uses it instead of the switch.
+    val helperOffer: Boolean = false,
+    val helperOn: Boolean = false,
 ) {
     // 0.4.7: the one state every screen reads when the TV keeps its own home screen (HomeKept).
     val homeKept: HomeKept? get() = HomeKept.of(this)
@@ -253,6 +259,8 @@ class SetupDeps(
     val wrongFocus: (TvId) -> Component? = { null },
     // 0.4.7: whether this TV's report was sent before (SentReports), for S3's careful mode line.
     val sentReports: SentReports? = null,
+    // RFC-HELPER-1: whether this build offers the Home button helper (the test build's bundled switch).
+    val homeHelper: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
 )
 
 // The first-run wizard, screens S1 to S5 (PRODUCT-SPEC 4, UX 2 and 4). One machine per wizard run,
@@ -525,6 +533,7 @@ class SetupMachine(
             }
             is SetupIntent.KeepDebuggingOn -> editDraft { it.copy(keepDebuggingOn = event.on) }
             is SetupIntent.ShowOnTv -> editDraft { it.copy(curtain = event.on) }
+            is SetupIntent.HomeHelper -> if (deps.homeHelper) editDraft { it.copy(homeHelper = event.on) }
             SetupIntent.MakeItClean -> if (after is SetupState.Found && !mutableExtras.value.starting) {
                 mutableExtras.update { it.copy(starting = true) }
                 scope.launch {
@@ -880,6 +889,24 @@ class SetupMachine(
         }
     }
 
+    // RFC-HELPER-1 (test build): the TV's own home screen the Home button helper would send on from,
+    // or null when Customise does not offer it here: not this build, a TV that refuses other home
+    // screens or installs or runs an old Android, a home screen changed by the person or unknown, our
+    // launcher already Home, or a rule of HomeHelper.refusal (a home screen that is not Google's, S3, S4).
+    private fun helperStock(snap: Snapshot, block: HomeBlock): Component? {
+        if (!deps.homeHelper) return null
+        if (block == HomeBlock.TV_REFUSES || block == HomeBlock.OLD_ANDROID || block == HomeBlock.HOME_CHANGED || block == HomeBlock.UNKNOWN_HOME) return null
+        if (snap.home.resolved?.pkg == deps.launcherPin.bundled().pkg) return null
+        val stocks = when (val r = resolution) {
+            is ProfileResolution.Exact -> r.profile.stockLaunchers
+            is ProfileResolution.BrandSureSet -> r.stockLaunchers
+            is ProfileResolution.None -> r.stockLaunchers
+            null -> return null
+        }
+        if (HomeHelper.refusal(snap, stocks, refusesOtherHomes = false, build = true) != null) return null
+        return HomeHelper.stock(snap, stocks)
+    }
+
     // Plans the Setup from the current snapshot and draft; pure and quick (the planner is pure).
     private suspend fun replan(record: Tv, fresh: Boolean = false) {
         val s = session ?: return
@@ -907,11 +934,15 @@ class SetupMachine(
         }
         val journals = attempt { deps.ledger.changes(record.id) }.getOrDefault(emptyList())
         val block = homeBlock(snap, wifi, journals, PatchWallFeeds.goesOff(snap, groups, draft.kept, draft.extraOff))
-        val possible = block == HomeBlock.NONE
+        // RFC-HELPER-1 (test build): the Home button helper instead of the switch, when the person
+        // switched it on in Customise and this TV meets its rules (HomeHelper.refusal, as the planner).
+        val helperStock = helperStock(snap, block)
+        val helper = helperStock != null && draft.homeHelper
+        val possible = block == HomeBlock.NONE && !helper
         val choices = Choices(
             kept = draft.kept, extraOff = draft.extraOff, dock = dock,
             theme = theme,
-            installLauncher = possible, takeover = possible,
+            installLauncher = possible || helper, takeover = possible, homeHelper = helper,
             replaceLauncherSigner = installed?.signer?.let { it != launcher.signer } ?: false,
             keepDebuggingOn = draft.keepDebuggingOn,
             wizardWifi = wifi,
@@ -940,7 +971,8 @@ class SetupMachine(
         lookContext = LookContext(apps = lookApps, others = candidates.filter { it.pkg !in kept }, mine = mine, new = new, tv = tvLook, cards = cards,
             keyNames = keyNames)
         val sheet = mutableExtras.value.look?.let { drafts.refresh(it, lookContext) } ?: drafts.open(choice, lookContext)
-        val look = if (!possible) null else attempt { val (doc, w) = drafts.docOf(sheet, dock, cards, lookContext); Look.encode(deps.encoder, deps.blobs, doc, w) }
+        val look = if (!possible && !helper) null else attempt { val (doc, w) = drafts.docOf(sheet, dock, cards, lookContext)
+            Look.encode(deps.encoder, deps.blobs, if (helper) HomeHelperKeys.with(doc, helperStock!!.pkg) else doc, w) }
             .onFailure { deps.log.line("setup: the look could not be encoded, planned without it") }.getOrNull()
         // What Manage starts from once the run pushed it, saved as the Look sheet saves it, in the new
         // form: a photo made here is kept for the TV (and saved as "mine") only once the TV has it.
@@ -967,7 +999,7 @@ class SetupMachine(
                 // 0.3.2 B3: why the home screen switch is or is not in the plan, once per change, and
                 // kept for the TV report (B1) that Manage makes without the TV.
                 val decision = HomeDecision.of(block, r.plan.sections.isNotEmpty(), snap.home.resolved?.pkg == launcher.pkg,
-                    app = deps.about?.version, profile = LogCodes.profile(res))
+                    app = deps.about?.version, profile = LogCodes.profile(res), redirect = helper)
                 if (decision != lastDecision) {
                     lastDecision = decision
                     deps.log.line("setup: ${decision.line}")
@@ -984,6 +1016,7 @@ class SetupMachine(
                 // The look step's draft and preview, from the whole draft dock (its waiting apps too).
                 mutableExtras.update {
                     it.copy(commands = commandsOf(r.plan), unknownModel = res !is ProfileResolution.Exact, homePossible = possible, homeBlock = block,
+                        helperOffer = helperStock != null, helperOn = helper,
                         noScreenLock = !deps.screenLock.available(), draft = draft, dock = dock.map { p -> AppChoice(p, label(p)) }, apps = apps,
                         dockColumns = columns, look = sheet, ownPicture = own, ownDim = saved?.dim ?: OwnPicture.DEFAULT_DIM,
                         newPicture = photo?.ref, newDim = photo?.dim ?: OwnPicture.DEFAULT_DIM, waiting = DockLayers.waiting(kept.size, columns),

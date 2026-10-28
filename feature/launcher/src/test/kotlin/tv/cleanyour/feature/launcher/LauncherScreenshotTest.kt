@@ -159,6 +159,9 @@ object LauncherShots {
         Shot("home_update_available") { HomeScreen(home(updateTo = "2.4"), {}, {}) },
         // Issue #275: TCL Google TV, the remote buttons the new home screen loses and the way back.
         Shot("home_tcl_remote_keys") { HomeScreen(home().copy(tvName = "TCL 55C755", tclRemoteKeys = true), {}, {}) },
+        // RFC-HELPER-1 (test build): the Home button helper's card, on (a Google TV) and switched off by the TV.
+        Shot("home_helper_on") { HomeScreen(home().copy(helper = tv.cleanyour.core.flows.HelperCard(tv.cleanyour.core.flows.HelperShown.ON, googleTv = true)), {}, {}) },
+        Shot("home_helper_off_by_tv") { HomeScreen(home().copy(helper = tv.cleanyour.core.flows.HelperCard(tv.cleanyour.core.flows.HelperShown.OFF_BY_TV, googleTv = false)), {}, {}) },
         // 0.4.0: a dated look ended; the earlier one is the TV's again, one tap puts it back.
         Shot("home_look_ended") { HomeScreen(home(themeId = "aurora", endedLook = "Diwali"), {}, {}) },
         // 0.3.3 D2 (issue #3): the new home screen isn't on the TV. Why, and the next step when there is one.

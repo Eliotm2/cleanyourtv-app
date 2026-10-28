@@ -44,6 +44,8 @@ class GoldenTest {
                 if (c.op is Op.ArmHomeWatchdog && line === r.lines.last()) continue   // the one multi-command template, checked by WatchdogTest
                 // RFC-THEME-1: the launcher provider's write and read, templates checked by ThemeProviderLinesTest.
                 if (ThemeProviderLines.FILES.any { f -> RemotePath(RemoteDir.OVERLAY, listOf(f)).let { ThemeProviderLines.matchesWrite(line.text, it) || ThemeProviderLines.matchesRead(line.text, it) } }) continue
+                // RFC-HELPER-1: the helper's templates, checked by HelperLinesTest.
+                if ((c.op is Op.AccessibilityAdd || c.op is Op.AccessibilityRemove || c.op is Op.ArmHelperWatchdog) && line === r.lines.last()) continue
                 ShellTokens.assertLine(line.text)
                 assertTrue(ShellTokens.tokenize(line.text).isNotEmpty(), c.name)
             }

@@ -116,4 +116,13 @@
     <string name="dock_body">Up to {count, spellout} along the bottom. Drag an app by its dots to change the order.</string>
     <string name="dock_waiting">{count, plural, one {# app waits} other {# apps wait}} in the grid until you pick more apps in a row in Look.</string>
 
+    <!-- RFC-HELPER-1 (test build): the Home button helper's card (PLAN 4.6). -->
+    <string name="helper_card_title">Home button helper</string>
+    <string name="helper_card_on">The Home button opens the new home screen through a small helper. The TV keeps its own home screen.</string>
+    <string name="helper_card_off_by_tv">The TV has switched the helper off (a restart or a cleaner app). Run Setup again to switch it back on.</string>
+    <string name="helper_card_no_redirect">The helper is on, but the look on the TV does not name the TV\'s home screen, so it does nothing. Switch it off, or run Setup again.</string>
+    <string name="helper_card_redirect_only">The new home screen is set up for the helper, but the helper is off. Run Setup again to switch it back on.</string>
+    <string name="helper_card_escape">On the TV: Settings &gt; Accessibility &gt; Home button switches it off too.</string>
+    <string name="helper_card_apps_only">Google TV keeps running in the background. Its Apps only mode quiets it, but it also switches Search and the Assistant off; you can switch it on in the TV\'s settings.</string>
+    <string name="helper_card_switch_off">Switch off</string>
 </resources>

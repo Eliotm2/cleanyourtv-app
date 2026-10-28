@@ -147,3 +147,28 @@ and a TV that never allowed this phone sees no dialog. The TV that answers is sa
 address (its plain TCP endpoints replaced). Setup's connect gives no identity check to a TV whose
 TvId is saved on this phone and that took its key without asking. No other interface changes.
 
+## RFC-HELPER-1: the Home button helper, a test build opt-in
+
+Test build only (0.4.8 track, -Pcyt.homeHelper=true; the release bundles no marker, so its planner
+refuses the helper and no screen offers it). The owner accepted an opt-in accessibility helper on
+2026-10-28; the design is research/remote-buttons/PLAN.md sections 4.3 to 4.9. The TV keeps its own
+home screen and its setup wizard; the launcher's HomeKeyService, with stock_home_redirect naming
+that home screen and key_filter false, opens the new home screen whenever the TV's own comes up.
+Frozen signatures grow, nothing is removed:
+
+- `Op` (5.2) gets `AccessibilityAdd(expected, component)`, `AccessibilityRemove(expected,
+  component, offIfEmpty)` and `ArmHelperWatchdog(component, seconds, token, offIfEmpty)`. Each
+  renders one `HelperLines` template (core/ops): a TV-side compare-and-set of
+  enabled_accessibility_services for the add and the planner's removal, a sed removal of that one
+  entry for Undo's inverse and the laptop scripts, and a safety timer that does the same removal
+  unless the phone defuses it. The renderer takes `com.gathin.tvhome/.HomeKeyService` and nothing
+  else, never a list of more than 16, and none of them writes accessibility_enabled 1.
+- `Choices` gets `homeHelper` (default false); `PlanKind` gets `HOME_HELPER_OFF` and `PlanRequest`
+  `HomeHelperOff`. `DefaultPlanner` takes `homeHelper` (default `HomeHelper.BUILD_ON`), last.
+- `UndoOrder` gets `Target.Helper` and `Phase.HELPER`, between package states and settings.
+- The engine runs the helper's guarded section (`SECTION_HELPER`) with its own step R vocabulary
+  (our entry out, accessibility_enabled 0, the timer defused, Home), looks twice at a focus on the
+  TV's own home screen before it rolls back, and checks the helper's priors for staleness.
+
+Not done, by decision: TCL's AUTO_START app-op, button mapping (app_keys), a probe of
+`dumpsys accessibility` (the snapshot's two settings and the overlay give Manage's states).
