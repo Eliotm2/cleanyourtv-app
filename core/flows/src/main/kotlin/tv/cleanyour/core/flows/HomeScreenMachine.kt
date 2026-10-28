@@ -217,7 +217,7 @@ class HomeScreenMachine(
             apps = dock, others = state.apps.filter { it.pkg !in inDock },
             mine = state.ownPicture?.let { LookPicture.Of(it, state.ownDim) }, new = state.newPicture?.let { LookPicture.Of(it, state.newDim) },
             earlier = earlier, sent = saved, tv = lookTv(state), cards = cards, keyNames = keyNames, tvChanged = state.drift,
-            pushDock = saved?.dock,
+            pushDock = saved?.dock, dockChosen = saved?.dockChosen ?: true,
         )
     }
 
@@ -233,11 +233,12 @@ class HomeScreenMachine(
             // a row), so a new dock never loses them. Apps in a row stays the saved one.
             // look2: a saved choice in the new form is pushed again in its own form; a legacy one
             // keeps its 0.4.0 bytes (LegacyLook) until the next send.
+            // 0.4.7: the dock is the person's own from now on (HomeChoice.dockChosen): fill_dock false.
             is HomeScreenIntent.SetDock -> scope.launch {
                 val tail = after.waitingApps.map { it.pkg }.filter { it !in event.dock }
                 val choice = savedChoice()
-                if (choice?.isNew == true) pushSaved(choice, event.dock + tail)
-                else apply(event.dock + tail, after.themeId, after.pictureId, columns = savedColumns())
+                if (choice?.isNew == true) pushSaved(choice.copy(dockChosen = true), event.dock + tail)
+                else apply(event.dock + tail, after.themeId, after.pictureId, columns = savedColumns(), dockChosen = true)
             }
             // RF-LAUNCHER-250 F4: a new look and "Restore mine" push the dock as it was saved, as
             // ModulesMachine does, not the list as the TV shows it now (an app since gone or switched
@@ -482,16 +483,20 @@ class HomeScreenMachine(
     // 0.4.0 `columns`: the apps in a row to send, null for the look's own; it is kept only when it
     // differs from the look's own. The whole `dock` is kept (DockLayers.keep, up to 24 apps), not the
     // part this many in a row shows, so a smaller row never loses the rest of the order.
-    private suspend fun apply(dock: List<PackageName>, themeId: String?, picture: String?, photo: NewPhoto? = null, columns: Int? = null) {
-        val cards = Cards.current(d, tvId, d.homePrefs.load(tvId))
+    // 0.4.7 `dockChosen`: true for a dock the person just saved, null keeps the saved choice's.
+    private suspend fun apply(dock: List<PackageName>, themeId: String?, picture: String?, photo: NewPhoto? = null, columns: Int? = null,
+        dockChosen: Boolean? = null) {
+        val before = d.homePrefs.load(tvId)
+        val chosenDock = dockChosen ?: before?.dockChosen ?: true
+        val cards = Cards.current(d, tvId, before)
         val pictureId = picture.takeUnless { Looks.dated(themeId) }
         val sendsNew = pictureId == LookPicture.NEW_ID && photo != null
         val dim = if (sendsNew) photo!!.dim else state.value.ownDim
         val lookPicture = if (sendsNew) LookPicture.Of(photo!!.ref, photo.dim)
             else OwnPicture.lookPicture(d, tvId, pictureId.takeUnless { it == LookPicture.NEW_ID }, dim)
         val override = drafts.override(themeId, columns)
-        val carry = HomeHelperFlows.carry(d, tvId)
-        val look = attempt { Look.encode(d.encoder, d.blobs, theme(themeId), dock, cards, lookPicture, override, carry) }.getOrNull()
+        val carry = LookCarry.of(d, tvId)
+        val look = attempt { Look.encode(d.encoder, d.blobs, theme(themeId), dock, cards, lookPicture, override, carry, fillDock = !chosenDock) }.getOrNull()
             ?: return effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false))
         val kept = DockLayers.keep(dock)
         val r = writer.write(tvId, PlanRequest.ApplyTheme(look.doc, look.config, look.wallpaper)) { send(BusyNow(it)) }
@@ -507,7 +512,7 @@ class HomeScreenMachine(
             val keepSaved = Looks.dated(themeId) || (pictureId == LookPicture.NEW_ID && !keptNew)
             val chosen = if (keptNew) LookPicture.MINE_ID else pictureId
             d.homePrefs.save(tvId, saved.withTheme(themeId, kept, cards, picture = if (keepSaved) saved.picture else chosen,
-                dim = if (keepSaved) saved.dim else if (chosen == LookPicture.MINE_ID) dim else null, columns = override))
+                dim = if (keepSaved) saved.dim else if (chosen == LookPicture.MINE_ID) dim else null, columns = override, dockChosen = chosenDock))
             rememberPushedLook(d, tvId, look.digest)
             send(Drift(false))
             effect(ManageEffect.Snackbar(SnackKind.HOME_SAVED, "", false))
@@ -529,7 +534,7 @@ class HomeScreenMachine(
         val cards = Cards.current(d, tvId, choice)
         val tv = lookTv(state.value)
         val own = attempt { OwnPicture.ref(d, tvId) }.getOrNull()
-        val carry = HomeHelperFlows.carry(d, tvId)
+        val carry = LookCarry.of(d, tvId)
         val look = attempt { val (doc, w) = drafts.docOf(choice, dock, cards, own, tv); Look.encode(d.encoder, d.blobs, carry(doc), w) }.getOrNull()
             ?: return effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false))
         val r = writer.write(tvId, PlanRequest.ApplyTheme(look.doc, look.config, look.wallpaper)) { send(BusyNow(it)) }
@@ -547,8 +552,8 @@ class HomeScreenMachine(
         if (r !is WriteResult.GateCancelled && r !is WriteResult.NoTv && r !is WriteResult.Paused) effect(ManageEffect.Snackbar(SnackKind.FAILED, "", false))
     }
 
-    // look2 "Put it on the TV": the draft in the new form (style keys outright, fill_dock false,
-    // columns always), with the saved dock. `photo`: a photo made in the sheet; the earlier look's
+    // look2 "Put it on the TV": the draft in the new form (style keys outright, fill_dock false for
+    // a dock the person chose, columns always), with the saved dock. `photo`: a photo made in the sheet; the earlier look's
     // photo comes from earlier.jpg. On success the choice is saved and the look the TV had before
     // becomes the earlier look (EarlierLook); a photo is kept for the TV only once the TV has it.
     // On failure the draft and the photo stay (lookFailed, OpenLook), and no generic snackbar shows.
@@ -561,7 +566,7 @@ class HomeScreenMachine(
             else null
         val sendsPhoto = photo ?: earlierPhoto
         val ctx = lookContext(at).copy(cards = cards)
-        val carry = HomeHelperFlows.carry(d, tvId)
+        val carry = LookCarry.of(d, tvId)
         val look = attempt { val (doc, w) = drafts.docOf(draft, dock, cards, ctx); Look.encode(d.encoder, d.blobs, carry(doc), w) }.getOrNull()
         if (look == null || (draft.newPhoto && sendsPhoto == null)) { send(LookResult(false)); return }
         val r = writer.write(tvId, PlanRequest.ApplyTheme(look.doc, look.config, look.wallpaper)) { send(BusyNow(it)) }
@@ -580,7 +585,7 @@ class HomeScreenMachine(
                 else -> at.ownDim
             }
             val kept = DockLayers.keep(dock)
-            val next = drafts.choiceOf(draft, before, kept, cards, picture, dim)
+            val next = drafts.choiceOf(draft, before, kept, cards, picture, dim, dockChosen = before?.dockChosen ?: true)
             attempt { EarlierLook.remember(d.documents, tvId, EarlierLook.firstLook(before, kept), next, keptNew, oldPhoto) }
             d.homePrefs.save(tvId, next)
             rememberPushedLook(d, tvId, look.digest)

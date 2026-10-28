@@ -49,6 +49,16 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   remote buttons), Manage's Home screen row says so with "Run Setup again" first, and a problem
   report has the line.
 
+### The dock and Live TV
+- Inputs on the new home screen now has a Live TV row on TVs whose Live TV app is not MediaTek's
+  (TCL, Sony, Philips, Xiaomi and most others): Setup and every dock or look change tell the new
+  home screen which app is the TV's Live TV, when that app is on the TV and switched on.
+- A Live TV tile the app put in the dock now shows on MediaTek TVs; the new home screen hid it.
+- The dock no longer shows empty spaces when the app picked it: spaces it could not fill (too few
+  apps, or one the TV no longer has) take the next apps, as the new home screen does on its own. A
+  dock you set yourself keeps its empty spaces. A TV set up before this version keeps its dock as it
+  is until Setup runs again.
+
 ### Reports
 - "Help add this TV" remembers that this TV's report was sent and when, on the report screen, on
   Manage and on the Home screen page, and keeps the issue's link once you paste it. Sending again

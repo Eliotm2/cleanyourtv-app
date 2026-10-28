@@ -162,6 +162,41 @@ class SetupLookTest {
         assertEquals(setup.wallpaper, push.wallpaper, "the same wallpaper.jpg")
     }
 
+    // 0.4.7: every push names the TV's Live TV app (Samples' com.android.tv), Setup's and each of
+    // Manage's after it, since the look's doc is built from scratch each time (LookKeys.build); and
+    // fill_dock follows who made the dock on every push: true for the dock Setup picked, false from
+    // the moment the person sets one in the Dock sheet, kept in home.txt for the pushes after it.
+    @Test fun everyPushAfterSetupNamesTheLiveTvAppAndFillsOnlyAPickedDock() = runTest(timeout = 30.seconds) {
+        val live = "com.android.tv"
+        val h = Harness()
+        val m = found(h)
+        assertEquals(listOf<Any?>(live, true), h.sentDoc().let { listOf(it.liveTvPackage, it.fillDock) }, "Setup, the picked dock")
+        makeItClean(h, m)
+        val tv = h.tvs.tvs.value.single()
+        assertEquals(false, HomePrefs(h.documents).load(tv.id)?.dockChosen)
+        assertTrue("\ndockchosen=false\n" in assertNotNull(h.documents.read("tvs/${tv.id.value}/home.txt") { it.decodeToString() }))
+        val home = HomeScreenMachine(h.manageDeps(encoder = ConfigEncoder.Codec, themes = looks), backgroundScope, tv.id)
+        settle()
+        fun pushed(): LauncherConfigDoc = assertIs<DecodeResult.Ok>(LauncherConfigCodec.decode(
+            h.blobs.bytes(h.planner.requests.filterIsInstance<PlanRequest.ApplyTheme>().last().config))).doc
+        fun check(fill: Boolean, what: String) = assertEquals(listOf<Any?>(live, fill), pushed().let { listOf(it.liveTvPackage, it.fillDock) }, what)
+        home.dispatch(HomeScreenIntent.OpenLook); settle()
+        home.dispatch(HomeScreenIntent.Look(LookEdit.SelectStyle(StyleId.GLASS))); settle()
+        home.dispatch(HomeScreenIntent.UseLook); settle()
+        check(true, "a look change after Setup")
+        home.dispatch(HomeScreenIntent.RestoreMine); settle()
+        check(true, "Restore mine")
+        home.dispatch(HomeScreenIntent.SetDock(apps.take(2))); settle()
+        check(false, "a dock the person set")
+        assertEquals(true, HomePrefs(h.documents).load(tv.id)?.dockChosen)
+        home.dispatch(HomeScreenIntent.OpenLook); settle()
+        home.dispatch(HomeScreenIntent.Look(LookEdit.SelectStyle(StyleId.CLASSIC))); settle()
+        home.dispatch(HomeScreenIntent.UseLook); settle()
+        check(false, "a look change after the person's dock")
+        home.dispatch(HomeScreenIntent.RestoreMine); settle()
+        check(false, "Restore mine after the person's dock")
+    }
+
     // A photo made in the look step is sent with its dim when Setup runs, and kept for the TV (as
     // "Restore mine" with that dim) only once the TV has it.
     @Test fun aPhotoMadeInSetupIsSentThenKeptForTheTv() = runTest(timeout = 30.seconds) {
