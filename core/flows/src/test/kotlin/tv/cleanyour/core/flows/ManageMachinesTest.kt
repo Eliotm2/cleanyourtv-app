@@ -1084,6 +1084,34 @@ class ManageMachinesTest {
         assertTrue(quiet.planner.requests.none { it is PlanRequest.UseStockHome })
     }
 
+    // 0.4.7 (xgimi-mogo-3-pro): the TV's own home screen this phone switched off claims Home again (XGIMI's remote
+    // buttons run pm enable on launcherx); Manage's connect read notices it, the card says so and the log has a line.
+    @Test fun aStockHomeScreenTheFirmwareSwitchedBackOnIsNoticedOnConnect() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        val tv = h.knownTv()
+        val stock = Samples.stockLauncher
+        val plan = h.plan(listOf(Op.ArmHomeWatchdog(stock, 150, RunToken("00000000000000ab")), Op.Disable(stock.pkg), Op.SetHome(Launcher.home)), id = "01FAKERUN0000000000000010")
+        h.ledger.record(plan)
+        h.journal.append(JournalRecord.PlanStart(plan.id, tv.id, Samples.zeroHash, 3, plan.hash, "0.1.0", 0))
+        plan.steps.forEach { st ->
+            h.journal.append(JournalRecord.Begin(plan.id, st.index, st.op, listOf("fake"), if (st.op is Op.SetHome) Prior(home = stock) else null, 10L + st.index))
+            h.journal.append(JournalRecord.Done(plan.id, st.index, 0, true, 5))
+        }
+        h.journal.append(JournalRecord.End(plan.id, RunStatus.COMPLETED))
+        h.prober.home = HomeResolution(stock, listOf(HomeClaimant(stock, 2), HomeClaimant(Launcher.home, 0)))
+        val m = ManageMachine(h.manageDeps(), backgroundScope, tv.id)
+        settle()
+        assertTrue(assertNotNull(m.state.value.current).stockHomeBack)
+        assertFalse(assertNotNull(m.state.value.current).wizardHome)
+        assertEquals(listOf("manage: the TV's own home screen is on again after this app switched it off, and Home answers to it"),
+            h.logLines.filter { it.startsWith("manage:") })
+        // Off again (or put back by the person through this app): nothing to say.
+        h.prober.home = HomeResolution(Launcher.home, listOf(HomeClaimant(Launcher.home, 0)))
+        m.dispatch(ManageIntent.Select(tv.id)); settle()
+        assertFalse(assertNotNull(m.state.value.current).stockHomeBack)
+        assertFalse(StockHomeBack.applies(HomeResolution(stock, listOf(HomeClaimant(stock, 2))), emptyList(), stock), "never switched off by this app")
+    }
+
     // 0.4.6: a put back whose app took the Home button pauses at the Home check after it
     // (DefaultPlanner.putBack). The open run card names the app, and its "Switch it off again" is
     // the run's own undo; a put back that paused anywhere else is the ordinary card.

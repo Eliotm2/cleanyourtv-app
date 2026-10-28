@@ -155,8 +155,9 @@ data class SetupExtras(
     val doneNothing: Boolean = false,            // 0.3.3 (issue #15): the run changed nothing on the TV, so Done says so
     val doneNothingWhy: NothingWhy = NothingWhy.NOTHING_PLANNED,   // which "nothing was changed" body Done shows
     val doneHomeKept: HomeOutcome? = null,       // QA of 0.4.5: the switch was tried and the TV's own home screen is back, why (Done's line)
-    // 0.4.7: the look (config.json or the picture) did not reach the TV while the new home screen
-    // took over (the push CONTINUEs); Done says so and the choice is saved for the Look sheet.
+    // 0.4.7 (UX finding 18, issues #1279, #1649): the look (config.json or the picture, by a sync push or
+    // the launcher's ThemeProvider) did not reach the TV while the new home screen took over (the
+    // look's steps CONTINUE); Done says so and the choice is saved for the Look sheet.
     val doneLookFailed: Boolean = false,
     // 0.4.7 (HomeKept): the TV's brand as its facts say it, for the TV_REFUSES reason; which rows of
     // the plan are the TV's own home screen or its setup wizard (the Customise sheet's words for
@@ -662,8 +663,13 @@ class SetupMachine(
                 val identity = result.session.identity
                 // D38: a TV that raised no Allow dialog and is new to this phone gets the "Is this your
                 // TV?" line with a screenshot before anything else happens.
-                val needsIdentity = !allowShown && known == null
-                deps.log.line("setup: connected (allow dialog ${if (allowShown) "shown" else "not shown"}, identity check ${if (needsIdentity) "needed" else "not needed"})")
+                // RFC-RECONNECT-1 (issue #1578): a TV this phone saved, found at a new address, is not new: its TvId is
+                // one of ours and it took this phone's key without asking, so it gets no identity check.
+                val movedTv = known == null && deps.tvs.tvs.value.any { it.id == identity.tvId }
+                if (movedTv) knownTv = deps.tvs.tvs.value.firstOrNull { it.id == identity.tvId }
+                val needsIdentity = !allowShown && known == null && !movedTv
+                deps.log.line("setup: connected (allow dialog ${if (allowShown) "shown" else "not shown"}, identity check ${if (needsIdentity) "needed" else "not needed"}" +
+                    "${if (movedTv) ", a saved TV at a new address" else ""})")
                 if (needsIdentity) {
                     val shot = attempt { deps.prober.screenshot(result.session) }.getOrNull()
                     mutableExtras.update { it.copy(identity = IdentityCheck(identity.model, identity.serialLast4, shot)) }
@@ -1196,6 +1202,8 @@ class SetupMachine(
         lastFinished = f
         mutableExtras.update { it.copy(rollingBack = false, highlightStop = false, reconnect = null) }
         if (f.home == HomeOutcome.VERIFY_FAILED) logHomeSwitchFailure(f.plan)
+        // 0.4.7: a look the TV refused is named in the log with the TV's answer, never only counted as a skip.
+        attempt { RunLines.lookSkipped(f, deps.ledger) }.getOrNull()?.let { deps.log.line("setup: $it") }
         when {
             // A Manage write resumed from the S4e card (after process death) ends in Manage, never on Done.
             f.plan.kind != PlanKind.SETUP -> effect(SetupEffect.Navigate("manage/${tvId.value}"))
@@ -1247,10 +1255,11 @@ class SetupMachine(
         // D15: the digest of the config.json this run pushed, so Manage can warn when it drifts.
         val pushed = plan?.let { pl -> deps.ledger.changes(tvId).lastOrNull { c -> c.planId == pl.id && (c.op as? Op.PushAsset)?.dest?.let { d -> d.dir == RemoteDir.OVERLAY && d.segments.last() == "config.json" } == true } }
         val digest = (pushed?.op as? Op.PushAsset)?.sha256
-        // UX finding 18: the look's push (config.json or the picture, into the overlay) CONTINUEs on
-        // failure, so the run ends well without it; Done says so, and the choice is saved anyway so
-        // the Look sheet opens on it and "Put it on the TV" sends it again.
-        val lookFailed = homeOn && setupHome != null && skipped.any { (it.op as? Op.PushAsset)?.dest?.dir == RemoteDir.OVERLAY }
+        // UX finding 18 (issues #1279, #1649): the look's steps (config.json or the picture, by a sync
+        // push or the launcher's ThemeProvider) CONTINUE on failure, so the run ends well without it;
+        // Done says so, and the choice is saved anyway so the Look sheet opens on it and "Put it on
+        // the TV" sends it again. The same steps as the log's and the report's "look not sent" line.
+        val lookFailed = homeOn && skipped.any { RunLines.isLookSend(it) }
         val done = record.copy(
             wizard = null,
             launcher = if (homeOn) LauncherState(launcher.versionCode, launcher.signer, digest ?: record.launcher?.overlayDigest, digest ?: record.launcher?.ourOverlayDigest)
@@ -1865,8 +1874,9 @@ class SetupMachine(
         fun commandsOf(plan: Plan): List<String> = plan.steps.flatMap { step ->
             val lines = step.rendered.lines.map { it.text }
             val t = step.rendered.transfer
-            lines + listOfNotNull(when (t) {
-                is Transfer.Push -> "sync:${t.dest.absolute} ${t.src.sha256.hex}"
+            // RFC-THEME-1: a push runs before the op's lines, so it is shown first.
+            listOfNotNull((t as? Transfer.Push)?.let { "sync:${it.dest.absolute} ${it.src.sha256.hex}" }) + lines + listOfNotNull(when (t) {
+                is Transfer.Push -> null
                 is Transfer.Pull -> "sync:${t.src.absolute} ${t.maxBytes}"
                 is Transfer.StreamInstall -> "sync:${t.src.path} ${t.size}"
                 null -> null

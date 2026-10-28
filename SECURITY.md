@@ -80,6 +80,16 @@ statements: no op renders `cmd notification`, `pm grant`, `WRITE_SECURE_SETTINGS
 the launcher, and the only accessibility writes are the two accessibility settings with the op's
 own value, which the planner uses only to put back the list the TV had.
 
+Since 0.4.7 (RFC-THEME-1) the app writes the look, `config.json` and `wallpaper.jpg`, through the
+launcher's theme provider (`content://com.gathin.tvhome.theme`, exported and guarded by
+`WRITE_SECURE_SETTINGS`, which the ADB shell holds) on Android 10 and later with launcher 2.5 or
+newer, the way upstream's `tools/theme.sh` does: the file is pushed to the app's folder in
+`/data/local/tmp`, `content write` copies it in as the launcher, the staged copy is removed, and the
+check reads it back with `content read` piped to `sha256sum`. A direct copy is the fallback where the
+provider does not answer. These are the renderer's two fixed templates beside the watchdog's
+(core/ops `ThemeProviderLines`), filled only from a two-entry list of file names and covered by
+golden files and the property tests. The provider takes nothing else from this app.
+
 Launcher 2.7 (upstream v2.7.0, commit 3e34f40, versionCode 8; was 2.5, v2.5.0, versionCode 6):
 
 - New permission `android.permission.WRITE_SECURE_SETTINGS`. It is a protected permission that

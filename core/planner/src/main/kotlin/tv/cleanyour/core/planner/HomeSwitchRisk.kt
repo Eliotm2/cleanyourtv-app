@@ -79,10 +79,36 @@ object HomeSwitchRisk {
     // either brand never meet the rest of the rule, their Home is com.mitv.tvhome.
     val XIAOMI_MAKERS: Set<String> = setOf("Xiaomi", "Redmi")
 
-    // beta4, after the incident of 0.4.6-beta2: a release gives R0 only on Android 9, 10 and 11, the
-    // versions the Xiaomi evidence covers (AXSO0, MiTV4I, MSSP0 on 9; AESP0 on 10; MOOQ1, MOOQ3, AYFR0
-    // and upstream's AXFR0 and AXFR1 on 11). The test build keeps every version.
-    val RELEASE_SDKS: IntRange = 28..30
+    // 0.4.7: where a release gives R0, as a reviewed table of graduated entries (research/release-0.4.7/
+    // R0-GRADUATION.md keeps the candidates and their counts). An entry is a brand or manufacturer (any of `makers`,
+    // case ignored), an Android SDK range, optionally only some models (`models`, by ro.product.model) and sets held
+    // out (`excludedDevices`, by ro.product.device). The rest of R0 (the wizard no Home claimant, tvlauncher on, the
+    // placeholders) and every incident block (VENDOR_HOME, OTHER_HOME, PATCHWALL_FEEDS, HELD_OUT, candidates never
+    // with R0) apply to every entry. The test build drops the table (ANY_BRAND_BUILD) and keeps the rest.
+    //
+    // Graduation rule (owner, 2026-10-28): a brand on an Android version already proven for it needs 2 confirmed
+    // testers; a new Android version for a brand needs 3. A confirmation is the tester's own words that the new home
+    // screen was still there after a restart of the TV, on a test build. Each entry cites its confirming issues.
+    data class Graduated(val makers: Set<String>, val sdks: IntRange, val models: Set<String> = emptySet(),
+                         val excludedDevices: Set<String> = emptySet(), val why: String) {
+        fun maker(f: DeviceFacts): Boolean = makers.any { it.equals(f.brand, ignoreCase = true) || it.equals(f.manufacturer, ignoreCase = true) }
+        fun covers(f: DeviceFacts): Boolean = maker(f) && f.sdk in sdks &&
+            (models.isEmpty() || models.any { it.equals(f.model, ignoreCase = true) }) && excludedDevices.none { it.equals(f.device, ignoreCase = true) }
+    }
+
+    val GRADUATED: List<Graduated> = listOf(
+        // 0.4.6 (beta4, after the incident of 0.4.6-beta2): Xiaomi and Redmi on Android 9, 10 and 11, the versions
+        // the Xiaomi evidence covers: the maintainer's MiTV-AXSO0 on 9 across reboots since 2026-10-20, the MiTV4I and
+        // MSSP0 on 9, AESP0 on 10, MOOQ1, MOOQ3 and AYFR0 on 11 (issues #1119, #1279 among them) and upstream's AXFR0
+        // and AXFR1 on 11. The MiTV-AXSO2 (dangalUHD) on 11 is held out in every build (HELD_OUT, issue #945).
+        Graduated(XIAOMI_MAKERS, 28..30, why = "Xiaomi and Redmi, Android 9 to 11 (0.4.6)"),
+        // Not yet: Xiaomi MiTV-MZTU1 (stepup) on Android 14. A new Android version for Xiaomi needs 3 testers who
+        // said the home screen stayed after a restart; #1505 (beta3) said so, #1117 and #868 (beta2) said it works
+        // without a restart. R0-GRADUATION.md has the entry to add when a third confirms.
+    )
+
+    // The release's R0 scope: a graduated entry covers the TV.
+    fun graduated(f: DeviceFacts): Boolean = GRADUATED.any { it.covers(f) }
 
     // Held out of R0 in every build, by device and Android version, until the owner of the TV that
     // failed answers: the Xiaomi MiTV-AXSO2 (dangalUHD) on Android 11 (issue #945), whose brand set
@@ -135,7 +161,7 @@ object HomeSwitchRisk {
 
     // beta3: what keeps a TV from R0, the first that applies (null: R0 lets it switch).
     // beta4: VENDOR_PLACEHOLDER, a FallbackHome claimant R0 does not take (r0Placeholder); SCOPE, an
-    // Android version a release does not give R0 (RELEASE_SDKS) or a set held out (HELD_OUT).
+    // Android version a release does not give R0 (GRADUATED since 0.4.7) or a set held out (HELD_OUT).
     enum class R0Blocker { NOT_THIS_PATH, BRAND, SCOPE, WIZARD_CLAIMS_HOME, NO_TVLAUNCHER, VENDOR_PLACEHOLDER, OTHER_HOME }
 
     // beta4, incident of 0.4.6-beta2 (issue #825): a Thomson SPPL 2K (sauve, Android 11, Realtek) with
@@ -191,7 +217,7 @@ object HomeSwitchRisk {
     // The wizard is never switched off on this path and the Wi-Fi is never touched, so the Wi-Fi
     // answer does not matter. Manage checks the claimants again on every connect (WizardHome).
     // `anyBrand` (a test build, ANY_BRAND_BUILD) drops the brand test and the Android versions of a
-    // release (RELEASE_SDKS, beta4) and keeps every other one, the sets held out (HELD_OUT) among them.
+    // release (the GRADUATED table, 0.4.7) and keeps every other one, the sets held out (HELD_OUT) among them.
     // beta3 (issue #1119, a MiTV4I with a home screen app the person installed): a claimant may also
     // be an app the person installed (installedHome). Android caps the HOME priority of an app that
     // is not a system app at 0, so with tvlauncher off it ties with ours and the set-home preference
@@ -202,8 +228,10 @@ object HomeSwitchRisk {
         r0Blocker(facts, snapshot, anyBrand) == null
 
     fun r0Blocker(facts: DeviceFacts, snapshot: Snapshot, anyBrand: Boolean = anyBrandNow): R0Blocker? {
-        if (!anyBrand && !isXiaomi(facts)) return R0Blocker.BRAND
-        if ((!anyBrand && facts.sdk !in RELEASE_SDKS) || heldOut(facts)) return R0Blocker.SCOPE
+        // 0.4.7: BRAND, no graduated entry names the TV's maker; SCOPE, one does but not this Android version or
+        // model, or the set is held out (in every build).
+        if (!anyBrand && GRADUATED.none { it.maker(facts) }) return R0Blocker.BRAND
+        if ((!anyBrand && !graduated(facts)) || heldOut(facts)) return R0Blocker.SCOPE
         fun on(p: PackageName) = snapshot.packages[p]?.enabled.let { it != EnabledState.DISABLED_USER && it != EnabledState.DISABLED }
         val claimants = snapshot.home.claimants.map { it.component }
         // A setup wizard among the claimants that is on, by any name (a placeholder that is a wizard too).

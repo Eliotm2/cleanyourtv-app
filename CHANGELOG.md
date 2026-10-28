@@ -33,9 +33,22 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
 - The Wi-Fi card (the setup wizard saved the TV's Wi-Fi) now keeps the TV's own home screen first,
   and tries again only once you say you have forgotten the saved networks. Its advice is the one
   that works: forget every saved Wi-Fi network, then join yours again; a cable alone does not help.
-- A look that did not reach the TV while the switch held is said on Done, and the choice is kept
-  for the Look sheet. In Manage, a look send that paused keeps the draft, and its card says "Your
-  look didn't reach the TV" with "Send it again" and "Undo".
+
+### The look and the connection
+- The look and its picture now reach TVs that refused them: Xiaomi and TCL sets on Android 11
+  that answered "PushAsset config.json: nonzero_exit(1)", and Android 14 sets where the new home
+  screen ignored the look. The app hands them to the home screen itself, as the launcher's own
+  theme tool does, and checks them the way the home screen reads them.
+- When the TV still refuses the look during setup, Done says so and the choice is kept for the
+  Look sheet, and a problem report names the step and the TV's answer. In Manage, a look send that
+  paused keeps the draft, and its card says "Your look didn't reach the TV" with "Send it again"
+  and "Undo".
+- Setup's Customise names the look you picked ("Classic with your photo", "Glass with Mist")
+  instead of "Look: Default".
+- A TV that got a new address on your Wi-Fi (a mesh network, a new router) is found again: when
+  its saved address does not answer, the app looks for it on the network, checks it is the same
+  TV with the key it already allowed, and saves the new address. No other TV is connected, and
+  none shows an Allow prompt.
 
 ### Reports
 - "Help add this TV" remembers that this TV's report was sent and when, on the report screen, on
@@ -51,6 +64,9 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   off.
 - Manage shows "Run Setup again" for every TV. The Custom level note no longer mentions the dock
   and the look.
+- "Check for updates" works on more phones: when GitHub's API turns the phone away (it allows
+  60 checks an hour per network address, which a mobile network or a VPN shares with many
+  people), the app reads the releases feed instead. When both fail, a problem report says why.
 - README: a "What your TV gets" section near the top, with the TV list page.
 
 ## 0.4.6 (2026-10-28)

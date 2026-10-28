@@ -672,13 +672,16 @@ class DefaultEngine(
             }
             else -> {}
         }
+        // RFC-THEME-1: a push goes first, so a line can use the file it put there (the launcher provider's write
+        // reads its staged copy); a pull goes after the lines that made its file (the screenshot).
+        (rendered.transfer as? Transfer.Push)?.let { t -> session.push(t.src, t.dest) }
         for (line in rendered.lines) {
             val r = send(session, line, ExecSpec(timeoutMs = rendered.timeoutMs, stdoutCap = rendered.stdoutCap, retry = RetryClass.NEVER))
             if (r.exit != 0) return Outcome.Refused(r.exit, r.stderr)
             ownOutput = r.stdout
         }
         when (val t = rendered.transfer) {
-            is Transfer.Push -> session.push(t.src, t.dest)
+            is Transfer.Push -> {}
             is Transfer.Pull -> { run.thumbnail = session.pull(t.src, t.maxBytes) }
             is Transfer.StreamInstall -> when (val o = session.installStream(t.src, t.size)) {
                 InstallOutcome.Installed -> {}

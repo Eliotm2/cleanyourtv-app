@@ -175,7 +175,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     val ledger = RunLedger(documents, journal)
     val runner = PlanRunner(planner, engine, gate, ledger, facts, snapshots, prober)
     val restorePoint = RestorePointWriter(restoreFiles, blobs, ledger, runner)
-    val access = TvAccess(sessions, discovery, tvs, clock)
+    val access = TvAccess(sessions, discovery, tvs, clock, log = FlowLog { CytLog.i(it) })
     val sessionEnd = SessionEnd(sessions, discovery, tvs, runner, foreground)
     val homePrefs = HomePrefs(documents)
     val appPrefs = AppPrefs(documents)
@@ -220,6 +220,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         store = store.rules,       // STORES-PLAN 1
         about = about, homeDecisions = homeDecisions,   // 0.3.2 B1, B2
         redact = Redactor::redact,                      // 0.4.6: what a card puts into a problem report
+        log = FlowLog { CytLog.i(it) },                 // 0.4.7: Manage's re-check lines (StockHomeBack)
     )
 
     init {

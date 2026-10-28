@@ -173,6 +173,9 @@
     <string name="customise_dock_row_rows">Dock: {names}, plus {count, plural, one {# app} other {# apps}} in the {rows, plural, one {row} other {rows}} below</string>
     <string name="customise_dock_row_empty">Dock</string>
     <string name="customise_look_row">Look: {theme}</string>
+    <!-- 0.4.7: the {theme} of the two rows for a look with the person's own photo, or a picture of the gallery -->
+    <string name="customise_look_photo">{style} with your photo</string>
+    <string name="customise_look_picture">{style} with {picture}</string>
     <!-- 0.4.0: the look and its apps in a row, when that is not the look's own -->
     <string name="customise_look_row_count">Look: {theme}, {count, plural, one {# app in a row} other {# apps in a row}}</string>
     <!-- look2: the photo crop in Setup's look step, under Use this crop (Setup has no Put it on the TV) -->
@@ -349,7 +352,7 @@
     <string name="done_home_kept_timed_out">The TV\'s own home screen is back: the check on the TV ran out of time. To try again later, open Home screen for this TV.</string>
     <string name="done_home_kept_said_no">The TV\'s own home screen is back: you said the new one didn\'t look right. To try again later, open Home screen for this TV.</string>
     <string name="done_home_kept">The TV\'s own home screen is back: the new one didn\'t take over. To try again later, open Home screen for this TV.</string>
-    <!-- 0.4.7 (UX finding 18): the look's push did not reach the TV while the switch held -->
+    <!-- 0.4.7 (UX finding 18, issues #1279, #1649): the look's send (a sync push or the launcher's ThemeProvider) did not reach the TV while the switch held -->
     <string name="done_look_failed">Your look didn\'t reach the TV. Send it again from Home screen.</string>
     <string name="done_restore_saved">Restore point saved on this phone ({date})</string>
     <!-- beta3: a later run; the restore point is the one from the first Setup, which Undo everything goes back to -->

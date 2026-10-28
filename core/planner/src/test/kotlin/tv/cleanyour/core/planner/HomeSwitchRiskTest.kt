@@ -565,4 +565,36 @@ class HomeSwitchRiskTest {
         assertTrue(source.resolveNow(axso2) is ProfileResolution.BrandSureSet, "the AXSO2 on Android 11 has no list in a release")
         releaseRule { assertEquals(listOf(Risk.WIZARD_STAYS_ON.reason), refused(setup(profile = null, choices = choices(wizardWifi = WizardWifi.NOT_OWNER)), snapshot = r0Tv(axso2))) }
     }
+
+    // 0.4.7: the release's R0 scope is the reviewed GRADUATED table. Its rows are pinned here, so a new row is a
+    // reviewed change of this test too (with its issues in the row's comment and R0-GRADUATION.md).
+    @Test fun theGraduatedTableIsTheReviewedOne() {
+        assertEquals(listOf(Triple(setOf("Xiaomi", "Redmi"), 28..30, emptySet<String>())),
+            HomeSwitchRisk.GRADUATED.map { Triple(it.makers, it.sdks, it.models) })
+        for (g in HomeSwitchRisk.GRADUATED) {
+            assertTrue(g.makers.isNotEmpty() && !g.sdks.isEmpty() && g.sdks.first >= 26 && g.why.isNotBlank(), g.toString())
+        }
+        // Android 14 Xiaomi (MiTV-MZTU1) has 1 of the 3 confirmations a new Android version needs: no R0 in a release.
+        val mztu1 = reported("MiTV-MZTU1", "stepup", 34, "Xiaomi/stepup/stepup:14/UKN1.240806.017/V816.0.26.6.8.3.UZTMBTV:user/release-keys")
+        assertEquals(HomeSwitchRisk.R0Blocker.SCOPE, HomeSwitchRisk.r0Blocker(mztu1, r0Tv(mztu1), anyBrand = false))
+        assertNull(HomeSwitchRisk.r0Blocker(mztu1, r0Tv(mztu1), anyBrand = true), "the test build keeps it")
+        // A brand with no row is BRAND, whatever its version.
+        val philips = axso1.copy(brand = "Philips", manufacturer = "TPV", device = "unknown")
+        assertEquals(HomeSwitchRisk.R0Blocker.BRAND, HomeSwitchRisk.r0Blocker(philips, r0Tv(philips), anyBrand = false))
+    }
+
+    // A row's optional parts: only some models, and sets held out by device; brand or manufacturer, case ignored.
+    @Test fun aGraduatedRowCoversItsMakersVersionsAndModelsOnly() {
+        val row = HomeSwitchRisk.Graduated(setOf("Xiaomi"), 34..34, models = setOf("MiTV-MZTU1"), excludedDevices = setOf("held"), why = "test")
+        val mztu1 = reported("MiTV-MZTU1", "stepup", 34, "Xiaomi/stepup/stepup:14/UKN1/1:user/release-keys")
+        assertTrue(row.covers(mztu1))
+        assertTrue(row.covers(mztu1.copy(model = "mitv-mztu1", brand = "xiaomi")))
+        assertTrue(row.covers(mztu1.copy(brand = "Redmi")), "the manufacturer is enough")
+        assertTrue(!row.covers(mztu1.copy(sdk = 33)))
+        assertTrue(!row.covers(mztu1.copy(model = "MiTV-MZTU2")))
+        assertTrue(!row.covers(mztu1.copy(device = "Held")))
+        assertTrue(!row.covers(mztu1.copy(brand = "Sony", manufacturer = "Sony")))
+        val anyModel = row.copy(models = emptySet())
+        assertTrue(anyModel.covers(mztu1.copy(model = "MiTV-MZTU2")))
+    }
 }
