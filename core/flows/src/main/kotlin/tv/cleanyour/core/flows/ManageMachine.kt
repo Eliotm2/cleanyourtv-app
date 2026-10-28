@@ -37,6 +37,11 @@ data class TvCard(
     // 0.4.6: on this connect a setup wizard claims Home while ours is Home and the TV's own home
     // screen is off (WizardHome); Manage offers to switch the TV's own home screen back on.
     val wizardHome: Boolean = false,
+    // 0.4.7 (UX finding 8): the new home screen is on the TV but not in use (NotOnTv.installed), so
+    // the Home screen row says the TV's own is in use instead of naming a dock.
+    val homeInstalledNotInUse: Boolean = false,
+    // 0.4.7: this TV's report was sent then (SentReports); the help banner says so.
+    val reportSentAtMs: Long? = null,
 )
 
 data class ManageState(
@@ -92,12 +97,19 @@ class ManageMachine(
                 if (tvs.isEmpty()) flowOf(emptyList()) else combine(tvs.map { d.engine.runState(it.id) }) { it.toList() }
             }
             combine(d.tvs.tvs, d.sessions.states, runs) { tvs, states, _ -> tvs to states }.collect { (tvs, states) ->
+                val pin = runCatching { d.launcherPin.bundled() }.getOrNull()
                 val cards = tvs.sortedByDescending { it.lastSeenAt }.map { tv ->
                     val run = d.engine.runState(tv.id).value
                     val offPkgs = d.ledger.switchedOffByUs(tv.id)
                     val off = offPkgs.size
                     val home = d.homePrefs.load(tv.id)
                     val latest = d.snapshots.latest(tv.id)
+                    val ours = latest?.packages?.get(Launcher.pkg)
+                    // Our launcher with our key (or one the probe could not read), not Home, and not a
+                    // launcher under our name Setup left as it is (HOME_CHANGED): installed, not in use.
+                    val mine = ours != null && tv.launcher == null && (ours.signer == null || pin == null || ours.signer == pin.signer)
+                    val decision = if (mine) attempt { d.homeDecisions.load(tv.id) }.getOrNull() else null
+                    val notInUse = mine && latest?.home?.resolved?.pkg != Launcher.pkg && decision?.alreadyOn != true && decision?.block == null
                     TvCard(
                         id = tv.id, name = tv.nickname, room = tv.room, clean = off > 0, checkedAtMs = tv.lastSeenAt, level = tv.level,
                         chip = chipFor(states[tv.id]?.takeIf { d.access.live(tv.id) != null }, run, tv.debugging),
@@ -109,6 +121,8 @@ class ManageMachine(
                         betterBackOn = if (PutBackAdvice.forProfile(tv.profileId).isEmpty()) 0
                             else PutBackAdvice.offers(tv.profileId, latest, d.ledger.changes(tv.id), d.profileOf(tv)).map { it.pkg }.distinct().count { it in offPkgs },
                         wizardHome = wizardHomes[tv.id] == true,
+                        homeInstalledNotInUse = notInUse,
+                        reportSentAtMs = if (tv.profileId == null) attempt { d.sentReports.load(tv.id) }.getOrNull()?.atMs else null,
                     )
                 }
                 send(Loaded(cards))

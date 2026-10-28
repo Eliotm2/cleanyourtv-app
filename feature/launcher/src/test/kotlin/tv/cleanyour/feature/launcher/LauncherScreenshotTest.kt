@@ -173,6 +173,14 @@ object LauncherShots {
         // beta4 (issue #945): PatchWall stays on while its feeds are off, not by this app.
         Shot("home_not_on_tv_patchwall_feeds") { HomeScreen(notOnTv(NotOnTv(HomeBlock.PATCHWALL_FEEDS, "Xiaomi", setupAgain = true), "Xiaomi MiTV-AXSO2"), {}, {}) },
         Shot("home_not_on_tv_earlier") { HomeScreen(notOnTv(NotOnTv(HomeBlock.WIZARD_STAYS_ON, "TCL", setupAgain = true, earlier = true), "TCL Percee TV"), {}, {}) },
+        // 0.4.7 (UX finding 8): installed but not in use, after a failed switch: Try the switch again.
+        Shot("home_not_on_tv_installed") { HomeScreen(notOnTv(NotOnTv(null, "Xiaomi", setupAgain = true, installed = true), "Mi TV 4A"), {}, {}) },
+        // 0.4.7 (PM 6): a designed outcome says so and shows the TV list before Report a problem.
+        Shot("home_not_on_tv_casting", 900.dp) { HomeScreen(notOnTv(NotOnTv(HomeBlock.CASTING, "Google"), "Google TV Streamer"), {}, {}) },
+        // 0.4.7 (must 4): the report sent before, on an unlisted TV.
+        Shot("home_not_on_tv_report_sent", 900.dp) {
+            HomeScreen(notOnTv(NotOnTv(HomeBlock.WIZARD_STAYS_ON, "Hisense", unlisted = true, helpAddTv = true, reportSentAtMs = Samples.NOW_MS - 86_400_000), "Hisense 32A4200G"), {}, {})
+        },
 
         // look2 Home: the Look row with its mini of what was last sent; a failed send kept for Open Look.
         Shot("home_look_row_mini") { HomeScreen(home().copy(sent = LookFixtures.preview(StyleId.GLASS), sentStyle = StyleId.GLASS, sentPicture = "mist",
