@@ -130,6 +130,8 @@ class ManageDeps(
     val stockHomeBacks: StockHomeBack.Reads = StockHomeBack.Reads(),
     // RFC-HELPER-1: whether this build shows the Home button helper (the test build's bundled switch).
     val homeHelper: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
+    // 0.4.8: the restarts this phone counted for each TV (Restarts); the app gives Setup the same one.
+    val restarts: Restarts = Restarts(documents),
 ) {
     fun tv(id: TvId): Tv? = tvs.tvs.value.firstOrNull { it.id == id }
 

@@ -145,6 +145,9 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
                     BannerTone.INFO, Modifier.padding(top = 16.dp),
                     actionLabel = stringResource(if (sent != null) R.string.manage_send_again else R.string.manage_help_add_tv), onAction = { onIntent(ManageIntent.HelpAddTv) })
             }
+            // 0.4.8 (Restarts): what the app counted across this TV's restarts. A restart that failed comes first,
+            // with Report a problem; else, once one held, "Tell us it worked" opens the confirmation's preview.
+            tv.restarts?.let { r -> RestartsBanner(r, onIntent) }
             // 0.4.6: on this connect a setup wizard claims Home while the TV's own home screen is off
             // (WizardHome). The way back sits above the rows, like the drift banner's "Restore mine";
             // its button writes to the TV, so it is guarded.
@@ -204,6 +207,37 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
                 ListDivider()
             }
             LinkRow(stringResource(R.string.manage_add_tv), { onIntent(ManageIntent.SetUpAnother) }, chevron = false, minHeight = 56.dp)
+        }
+    }
+}
+
+// 0.4.8: the restart count's banner on Manage. Neither action writes to the TV: one opens the preview, the other the
+// prefilled problem form.
+@Composable
+private fun RestartsBanner(r: tv.cleanyour.core.flows.RestartTally, onIntent: (ManageIntent) -> Unit) {
+    val locale = LocalConfiguration.current.locales[0]
+    when {
+        r.lastFailed && r.failed > 0 -> {
+            val title = stringResource(R.string.manage_restart_failed)
+            Banner(
+                buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Medium)) { append(title) }; append("\n"); append(stringResource(R.string.manage_restart_failed_body)) },
+                BannerTone.WARNING, Modifier.padding(top = 16.dp),
+                actionLabel = stringResource(R.string.manage_restart_report), onAction = { onIntent(ManageIntent.ReportRestartFailed(title)) },
+            )
+        }
+        r.held > 0 -> {
+            val told = r.toldAtMs
+            val body = if (told != null) msg(R.string.manage_restarts_told, "date" to shortDate(told, locale)) else stringResource(R.string.manage_restarts_ask)
+            val action = when {
+                told == null -> stringResource(R.string.manage_restarts_tell)
+                r.held > r.toldHeld -> stringResource(R.string.manage_restarts_tell_again)
+                else -> null
+            }
+            Banner(
+                buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Medium)) { append(msg(R.string.manage_restarts_held, "count" to r.held)) }; append("\n"); append(body) },
+                BannerTone.SUCCESS, Modifier.padding(top = 16.dp),
+                actionLabel = action, onAction = { onIntent(ManageIntent.TellUsItWorked) },
+            )
         }
     }
 }

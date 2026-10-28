@@ -65,6 +65,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import tv.cleanyour.ui.design.component.LookEditorState
 import tv.cleanyour.ui.design.component.TvPreview
+import tv.cleanyour.ui.design.component.TvThumbnail
+import tv.cleanyour.ui.design.component.rememberPng
 import tv.cleanyour.ui.design.component.galleryPictureName
 import tv.cleanyour.ui.design.component.lookPicture
 import tv.cleanyour.ui.design.component.styleName
@@ -102,6 +104,16 @@ fun HomeScreen(
             LiveLine(stringResource(R.string.home_applying))
             if (busy is Busy.Working) ProgressBar(busy.percent / 100f, Modifier.padding(top = 16.dp))
         }
+        // 0.4.8 (PLAN item 3): after a look went to the TV, what the TV shows now; "Send it again" sends the saved
+        // look as "Restore mine" does, so it is a guarded write.
+        state.lookShot?.takeIf { busy == null }?.let { png ->
+            ListGroup(Modifier.padding(top = 16.dp)) {
+                ListRow(stringResource(R.string.home_tv_now_title))
+                TvThumbnail(rememberPng(png), stringResource(R.string.home_tv_now_cd), Modifier.padding(start = 16.dp, end = 16.dp), label = null)
+                TertiaryButton(stringResource(R.string.home_tv_now_again), { onIntent(HomeScreenIntent.RestoreMine) }, Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
+                    guardObscured = true)
+            }
+        }
         ListGroup(Modifier.padding(top = 20.dp)) {
             // The dock's apps by name, and how many more sit in the rows under it.
             val inDock = state.dock.take(state.columns).joinToString(", ") { it.name }
@@ -135,7 +147,8 @@ fun HomeScreen(
         state.helper?.let { HomeHelperCard(it, enabled = busy == null, onIntent) }   // RFC-HELPER-1 (test build)
         // RFC-HELPER-1 (test build): while the helper is listed the TV's own home screen is already
         // Home; the helper's Switch off is the way back, so no "Use the TV's own home screen".
-        if (state.stock != null && state.homeScreenOurs && state.helper?.canSwitchOff != true) {
+        // 0.4.8 (beta1 QA): nor when the TV's own home screen answers Home already (after the helper's Switch off).
+        if (state.stock != null && state.homeScreenOurs && state.helper?.canSwitchOff != true && !state.stockIsHome) {
             ListGroup(Modifier.padding(top = 12.dp)) {
                 ListRow(stringResource(R.string.home_row_stock), subtitle = stringResource(R.string.home_row_stock_note),
                     onClick = if (busy == null) ({ onIntent(HomeScreenIntent.PreviewStock) }) else null)

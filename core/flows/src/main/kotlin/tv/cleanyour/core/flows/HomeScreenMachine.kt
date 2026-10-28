@@ -2,6 +2,7 @@ package tv.cleanyour.core.flows
 
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tv.cleanyour.core.engine.RunStatus
 import tv.cleanyour.core.model.BlobRef
@@ -111,6 +112,12 @@ data class HomeScreenState(
     val lookSending: Boolean = false,
     // RFC-HELPER-1 (test build): the Home button helper's card, null when nothing of it is on the TV.
     val helper: HelperCard? = null,
+    // 0.4.8 (beta1 QA): the newest read of the TV has its own home screen (`stock`) answering Home already, so "Use
+    // the TV's own home screen" has nothing to do (after the helper's Switch off, for one).
+    val stockIsHome: Boolean = false,
+    // 0.4.8 (PLAN item 3): "This is your TV now", the TV's screenshot after a look went to it from this page; null
+    // before a send, while one runs, or when the TV gave no picture.
+    val lookShot: ByteArray? = null,
 ) {
     val waiting: Int get() = waitingApps.size
 }
@@ -144,6 +151,9 @@ class HomeScreenMachine(
     private val d: ManageDeps,
     scope: CoroutineScope,
     private val tvId: TvId,
+    // 0.4.8: opened from Done's "Not right? Send it again": the saved look goes to the TV again once the page has
+    // loaded, as "Restore mine" sends it (the person's tap on Done is the ask; the write asks for the credential).
+    private val again: Boolean = false,
 ) : Machine<HomeScreenState, HomeScreenIntent, ManageEffect>(HomeScreenState(themes = offeredThemes(d)), scope) {
 
     private val writer = TvWriter(d)
@@ -155,6 +165,7 @@ class HomeScreenMachine(
     private data class UpdatePreview(val plan: Plan?)
     private class OwnPictureStaged(val ref: BlobRef, val dim: Int, val jpeg: ByteArray)
     private data class LookResult(val sent: Boolean)
+    private class LookShot(val png: ByteArray?)
     private var staged: ByteArray? = null   // the bytes of state.newPicture, kept once the TV has them
     private var updated = false   // D4: this screen updated the launcher; the stored snapshot does not know yet
     // look2: what the Look sheet works from, as the last load read it: the saved choice (what was
@@ -166,11 +177,11 @@ class HomeScreenMachine(
     private var kept: LookDraft? = null      // the draft of a send in flight, or of one that failed (OpenLook reopens it)
     private var sending = false              // one send per UseLook
 
-    init { scope.launch { load(); checkDrift() } }
+    init { scope.launch { load(); checkDrift(); if (again && state.value.notOnTv == null) send(HomeScreenIntent.RestoreMine) } }
 
     override fun reduce(state: HomeScreenState, event: Any): HomeScreenState = when (event) {
         is Loaded -> event.s.copy(busy = state.busy, stockPreview = state.stockPreview, drift = state.drift, updatePreview = state.updatePreview,
-            newPicture = state.newPicture, newDim = state.newDim, lookFailed = state.lookFailed, lookSending = state.lookSending).let { s ->
+            newPicture = state.newPicture, newDim = state.newDim, lookFailed = state.lookFailed, lookSending = state.lookSending, lookShot = state.lookShot).let { s ->
             saved = event.saved; earlier = event.earlier; cards = event.cards; keyNames = event.keyNames
             s.copy(look = state.look?.let { drafts.refresh(it, lookContext(s)) })
         }
@@ -190,8 +201,12 @@ class HomeScreenMachine(
         // Closing the sheet drops a photo made in it and its dim, and a draft kept from a failed send.
         HomeScreenIntent.CloseLook -> { kept = null; state.copy(look = null, newPicture = null, newDim = state.ownDim, lookFailed = false) }
         // "Put it on the TV" closes the sheet; the draft and a new photo stay until the result.
-        HomeScreenIntent.UseLook -> state.copy(look = null, lookFailed = false,
+        // 0.4.8 (beta1 QA): only a draft that would change something is sent (LookDraft.canSend; the sheet offers no
+        // button otherwise); the screenshot of the last send goes with a new one.
+        HomeScreenIntent.UseLook -> if (state.look?.canSend == false) state else state.copy(look = null, lookFailed = false, lookShot = null,
             lookSending = state.lookSending || (state.look != null && state.busy == null && state.notOnTv == null))
+        HomeScreenIntent.RestoreMine, is HomeScreenIntent.SetDock, is HomeScreenIntent.SetTheme -> state.copy(lookShot = null)
+        is LookShot -> state.copy(lookShot = event.png)
         is LookResult -> if (event.sent) state.copy(newPicture = null, newDim = state.ownDim, lookFailed = false, lookSending = false)
             else state.copy(lookFailed = true, lookSending = false)
         // A photo made for a sheet that has closed since is dropped.
@@ -247,7 +262,7 @@ class HomeScreenMachine(
             is HomeScreenIntent.SetTheme -> if (Looks.offered(event.id, d.clock.today())) scope.launch { apply(savedDock() ?: after.dock.map { it.pkg }, event.id, event.picture, columns = null) }
             // look2: the draft goes to the TV in the new form; it and a new photo are kept until the
             // result, so a failed send loses neither (OpenLook reopens the draft).
-            HomeScreenIntent.UseLook -> before.look?.takeUnless { sending }?.let { l ->
+            HomeScreenIntent.UseLook -> before.look?.takeUnless { sending || !it.canSend }?.let { l ->
                 val photo = when (l.picture) {
                     LookPicture.NEW_ID -> staged?.let { b -> before.newPicture?.let { NewPhoto(it, b, before.newDim) } }
                     else -> null
@@ -328,7 +343,9 @@ class HomeScreenMachine(
             ownPicture = own, ownDim = choice?.dim ?: OwnPicture.DEFAULT_DIM,
             waitingApps = waiting, earlierPicture = earlierLook?.photo?.ref, sent = sentPreview, sentStyle = drafts.styleOf(choice, tvLook),
             sentPicture = drafts.pictureIdOf(choice, tvLook), launcherVersionCode = versionCode, ramMb = ramMb, hasInputs = hasInputs,
-            helper = HomeHelperFlows.card(snap, d.homeHelper)),
+            helper = HomeHelperFlows.card(snap, d.homeHelper),
+            stockIsHome = snap != null && (profile?.stockLaunchers?.firstOrNull() ?: attempt { HomePlaceholder.stockFromRecords(d.ledger.changes(tvId)) }.getOrNull())
+                ?.let { st -> snap.home.resolved?.pkg == st.pkg } == true),
             choice, earlierLook, cardsNow, keys))
     }
 
@@ -449,6 +466,7 @@ class HomeScreenMachine(
 
         // Launcher 2.4 (versionCode 5) added Launcher settings on the TV (RF-LAUNCHER-240 F16).
         const val FIRST_WITH_TV_SETTINGS = 5L
+        const val LOOK_SHOT_DELAY_MS = 2_000L
         const val DEFAULT_LOOK = "default"
 
         // 0.4.0: the looks on offer today; a dated look (a festival) up to its last day.
@@ -512,6 +530,7 @@ class HomeScreenMachine(
             send(Drift(false))
             effect(ManageEffect.Snackbar(SnackKind.HOME_SAVED, "", false))
             load()
+            scope.launch { shot(r.finished.status) }
             return
         }
         load()
@@ -540,6 +559,7 @@ class HomeScreenMachine(
             send(Drift(false))
             effect(ManageEffect.Snackbar(SnackKind.HOME_SAVED, "", false))
             load()
+            scope.launch { shot(r.finished.status) }
             return
         }
         load()
@@ -590,6 +610,7 @@ class HomeScreenMachine(
             send(Drift(false))
             effect(ManageEffect.Snackbar(SnackKind.HOME_SAVED, "", false))
             load()
+            scope.launch { shot(r.finished.status) }
             return
         }
         load()
@@ -598,6 +619,15 @@ class HomeScreenMachine(
         if (r is WriteResult.Paused) { send(LookResult(false)); return }
         if (r is WriteResult.Refused && state.value.notOnTv != null) { this.kept = null; send(LookResult(true)); return }
         send(LookResult(false))
+    }
+
+    // 0.4.8 (PLAN item 3): after a look reached the TV, the TV as it looks now, by the same screenshot Manage's card
+    // takes; a moment first, so the home screen has drawn the new look.
+    private suspend fun shot(status: RunStatus) {
+        if (status != RunStatus.COMPLETED && status != RunStatus.COMPLETED_WITH_SKIPS) return
+        delay(LOOK_SHOT_DELAY_MS)
+        val s = d.access.live(tvId) ?: return
+        send(LookShot(attempt { d.prober.screenshot(s) }.getOrNull()))
     }
 
     // RFC-HELPER-1: "Switch off" of the Home button helper: our HomeKeyService out of the list, every

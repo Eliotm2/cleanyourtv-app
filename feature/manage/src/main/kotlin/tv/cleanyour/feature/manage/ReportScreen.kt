@@ -43,6 +43,7 @@ import tv.cleanyour.ui.design.theme.Glow
 @Composable
 fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val tvReport = state.kind == ReportKind.TV
+    val confirm = state.kind == ReportKind.CONFIRM   // 0.4.8: "Tell us it worked"
     val ready = !state.loading && state.available
     val locale = LocalConfiguration.current.locales[0]
     ScreenScaffold(
@@ -56,12 +57,12 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
             }
         }),
     ) {
-        ScreenTitle(stringResource(if (tvReport) R.string.report_tv_title else R.string.report_problem_title), Modifier.padding(top = 20.dp))
+        ScreenTitle(stringResource(when { confirm -> R.string.report_confirm_title; tvReport -> R.string.report_tv_title; else -> R.string.report_problem_title }), Modifier.padding(top = 20.dp))
         when {
             state.loading -> LiveLine(stringResource(R.string.report_loading))
-            !state.available -> Lead(stringResource(R.string.report_unavailable), Modifier.padding(top = 12.dp))
+            !state.available -> Lead(stringResource(if (confirm) R.string.report_confirm_unavailable else R.string.report_unavailable), Modifier.padding(top = 12.dp))
             else -> {
-                Lead(stringResource(if (tvReport) R.string.report_tv_body else R.string.report_problem_body), Modifier.padding(top = 12.dp))
+                Lead(stringResource(when { confirm -> R.string.report_confirm_body; tvReport -> R.string.report_tv_body; else -> R.string.report_problem_body }), Modifier.padding(top = 12.dp))
                 val sent = state.sent
                 if (tvReport && sent != null) {
                     val issue = sent.issueUrl?.let { SentReports.issueNumber(it) }
@@ -81,7 +82,7 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                 Banner(stringResource(R.string.report_public), BannerTone.INFO, Modifier.padding(top = 16.dp), icon = CytIcons.Info)
                 // Before the report, so it is read before GitHub opens however long the report is.
                 if (!state.inLink) Body(stringResource(R.string.report_too_long), Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp))
-                SectionLabel(stringResource(R.string.report_preview_label))
+                SectionLabel(stringResource(if (confirm) R.string.report_confirm_label else R.string.report_preview_label))
                 // Wrapped and one text node: no sideways scrolling on a phone, and TalkBack reads it as one block.
                 MonospaceBlock(state.text.trimEnd().lines(), wrap = true)
                 // In the scrolling content, not the bottom bar, so at large font sizes the report keeps the room.

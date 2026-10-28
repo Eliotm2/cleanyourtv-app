@@ -67,6 +67,10 @@
     <string name="home_help_add_tv">Help add this TV</string>
     <!-- 0.4.6: opens the GitHub form with why the new home screen isn't on this TV filled in -->
     <string name="home_report">Report a problem</string>
+    <!-- 0.4.8: "This is your TV now", the TV's screenshot after a look went to it from this page -->
+    <string name="home_tv_now_title">This is your TV now</string>
+    <string name="home_tv_now_cd">What the TV shows now</string>
+    <string name="home_tv_now_again">Not right? Send it again</string>
     <!-- 0.4.7 (UX finding 8): installed, not in use, after a failed switch or Use the TV's own home screen -->
     <string name="home_installed_lead">The new home screen is installed but isn\'t in use. The TV\'s own home screen is in charge.</string>
     <string name="home_installed_body">Try the switch again runs Setup once more and checks the home screen with you on the TV.</string>

@@ -63,6 +63,15 @@
     <string name="manage_offline_banner">Lost the TV. Is it still on?</string>
     <string name="manage_reconnect">Reconnect</string>
     <string name="manage_reconnecting">Reconnecting...</string>
+    <!-- 0.4.8: what the app counted across the TV's restarts (Restarts), and the one tap that tells us -->
+    <string name="manage_restarts_held">{count, plural, one {Held through # restart} other {Held through # restarts}}</string>
+    <string name="manage_restarts_ask">It counts for this TV model. You see what goes first.</string>
+    <string name="manage_restarts_told">You told us on {date}. Thank you.</string>
+    <string name="manage_restarts_tell">Tell us it worked</string>
+    <string name="manage_restarts_tell_again">Tell us again</string>
+    <string name="manage_restart_failed">The TV\'s own home screen came back after a restart.</string>
+    <string name="manage_restart_failed_body">Tell us, so we can look at this TV model.</string>
+    <string name="manage_restart_report">Report a problem</string>
 
     <!-- M1a Debugging step for a returning write (UX 4.3, returning) -->
     <string name="debugstep_title">To change things on the TV, debugging needs to be on for a moment.</string>
@@ -215,6 +224,11 @@
     <string name="report_tv_title">Help add this TV</string>
     <string name="report_tv_body">This report says what this TV is and which apps it came with, so we can make a list for it. Apps you installed yourself are only counted, never named.</string>
     <string name="report_problem_title">Report a problem</string>
+    <!-- 0.4.8: "Tell us it worked", the confirmation's preview (ReportKind.CONFIRM) -->
+    <string name="report_confirm_title">Tell us it worked</string>
+    <string name="report_confirm_body">This says the new home screen held on this TV, with the TV\'s model and what the app counted. Nothing else: no names, no addresses.</string>
+    <string name="report_confirm_unavailable">No restart has been counted on this TV yet. Restart it once with the app connected, then try again.</string>
+    <string name="report_confirm_label">What goes to GitHub</string>
     <string name="report_problem_body">This report has the steps we ran and a short summary of the TV, as plain text. Addresses, serial numbers, keys and codes are removed first. The steps can name apps we switched off or tried to.</string>
     <string name="report_public">This is public if you post it on GitHub. The app sends nothing itself: you choose where it goes.</string>
     <string name="report_preview_label">The report</string>

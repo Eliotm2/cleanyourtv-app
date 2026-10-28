@@ -24,6 +24,8 @@ import tv.cleanyour.core.flows.LeftoversState
 import tv.cleanyour.core.flows.ManageState
 import tv.cleanyour.core.flows.ReportKind
 import tv.cleanyour.core.flows.ReportState
+import tv.cleanyour.core.flows.HomePath
+import tv.cleanyour.core.flows.RestartTally
 import tv.cleanyour.core.flows.SentReport
 import tv.cleanyour.core.flows.OffGroup
 import tv.cleanyour.core.flows.OffRow
@@ -168,7 +170,42 @@ private val problemReport = """
     1792745323148 I setup: run paused STEP_FAILED at step 72: undo step failed: Enable com.amazon.tv.launcher: nonzero_exit(1)
 """.trimIndent()
 
-private fun report(kind: ReportKind, text: String = if (kind == ReportKind.TV) tvReport else problemReport, inLink: Boolean = true) =
+// 0.4.8: the confirmation block (TvReport.confirmation), as the preview shows it.
+private val confirmation = """
+    Clean Your TV: confirmation
+    Format: 1
+    App: 0.4.8 (full)
+    Build kind: test build
+    Phone: Samsung SM-S921B, Android 16
+
+    TV
+    Brand: Xiaomi
+    Manufacturer: Xiaomi
+    Model: MiTV-AXSO0
+    Device: dangal
+    Android: 9 (SDK 28)
+    Build: Xiaomi/dangal/dangal:9/PI/2120:user/release-keys
+
+    Home screen
+    Profile: exact xiaomi-mitv-axso0
+    Home switch: planned
+
+    Restarts
+    Home path: list
+    Held: 3
+    Failed: 0
+    Last restart: held
+    First counted: 2026-10-28
+    Last counted: 2026-10-30
+    Counted by: 0.4.8 (full, test build)
+    Look route: provider
+    Checked: boot_id and Home only
+""".trimIndent()
+
+private fun held(n: Int, told: Long? = null) = RestartTally(bootId = "b", answered = true, path = HomePath.LIST, held = n, firstAtMs = NOW - 2 * 86_400_000, lastAtMs = NOW,
+    build = "0.4.8 (full, test build)", toldAtMs = told, toldHeld = if (told != null) n else 0)
+
+private fun report(kind: ReportKind, text: String = when (kind) { ReportKind.TV -> tvReport; ReportKind.CONFIRM -> confirmation; else -> problemReport }, inLink: Boolean = true) =
     ReportState(kind, loading = false, text = text, url = "https://github.com/udhaykumarbala/cleanyourtv-app/issues/new", available = true, inLink = inLink)
 
 private val tall = 1100.dp
@@ -215,6 +252,10 @@ object ManageShots {
         Shot("manage_stock_home_back", tall) { ManageScreen(manage(card().copy(stockHomeBack = true)), {}) },
         // RFC-HELPER-1 (test build): the Home button helper is on; the Home screen row says so.
         Shot("manage_home_helper", tall) { ManageScreen(manage(card().copy(homeHelperOn = true)), {}) },
+        // 0.4.8 (Restarts): held through restarts, with "Tell us it worked"; told already; a restart that failed.
+        Shot("manage_restarts_held", tall) { ManageScreen(manage(card().copy(restarts = held(3))), {}) },
+        Shot("manage_restarts_told", tall) { ManageScreen(manage(card().copy(restarts = held(1, told = NOW))), {}) },
+        Shot("manage_restart_failed", tall) { ManageScreen(manage(card().copy(restarts = held(2).copy(failed = 1, lastFailed = true, answered = false))), {}) },
         Shot("manage_two_tvs", tall) {
             val other = card().copy(id = TvId("1111222233334444"), name = "Bedroom Chromecast", room = "Bedroom")
             ManageScreen(manage(others = listOf(other)), {})
@@ -228,6 +269,9 @@ object ManageShots {
         // 0.4.7 (must 4): the report sent before, without and with the issue's link.
         Shot("report_tv_sent", tall) { ReportScreen(report(ReportKind.TV).copy(sent = SentReport(NOW - 86_400_000)), {}, {}) },
         Shot("report_tv_sent_issue", tall) { ReportScreen(report(ReportKind.TV).copy(sent = SentReport(NOW - 86_400_000, "https://github.com/udhaykumarbala/cleanyourtv-app/issues/1368")), {}, {}) },
+        // 0.4.8: "Tell us it worked", the confirmation's preview, and before a restart was counted.
+        Shot("report_confirm", tall) { ReportScreen(report(ReportKind.CONFIRM), {}, {}) },
+        Shot("report_confirm_unavailable") { ReportScreen(ReportState(ReportKind.CONFIRM, loading = false, available = false), {}, {}) },
         Shot("report_loading") { ReportScreen(ReportState(ReportKind.TV), {}, {}) },
         Shot("report_unavailable") { ReportScreen(ReportState(ReportKind.TV, loading = false, available = false), {}, {}) },
 

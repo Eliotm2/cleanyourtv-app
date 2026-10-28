@@ -35,8 +35,13 @@ import tv.cleanyour.core.store.DocumentStore
 
 // The app and the phone the report comes from; the app fills it from its versionName, its store
 // flavour and android.os.Build.
-data class AppAbout(val version: String, val flavour: String, val phone: String, val phoneAndroid: String) {
+// 0.4.8: `testBuild`, a build with any of the test switches (candidate lists, R0 for any brand, the Home button helper),
+// for the confirmation's "Build kind" line; the graduation rule counts test builds.
+data class AppAbout(val version: String, val flavour: String, val phone: String, val phoneAndroid: String, val testBuild: Boolean = false) {
     val appLine: String get() = "$version ($flavour)"
+    val buildKind: String get() = if (testBuild) "test build" else "release"
+    // "0.4.8 (github, test build)": what counted a restart (RestartTally.build).
+    val countLine: String get() = "$version ($flavour, $buildKind)"
     val phoneLine: String get() = listOf(phone, phoneAndroid).filter { it.isNotBlank() }.joinToString(", ").ifEmpty { "unknown" }
 }
 
@@ -137,7 +142,13 @@ data class TvReportInput(
     val stockHomeBack: Boolean = false,
     // RFC-HELPER-1 (test build): the Accessibility section (PLAN 4.7); off in a release build.
     val accessibility: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
+    // 0.4.8: what this phone counted across the TV's restarts (Restarts), for every report of a TV it switched.
+    val restarts: RestartFacts? = null,
 )
+
+// 0.4.8: the restart count as a report says it: the home path, held and failed, when, which app counted, and the
+// look's route (the last look this app sent: by the launcher's ThemeProvider, a sync push, or none).
+data class RestartFacts(val path: HomePath, val tally: RestartTally, val lookRoute: String)
 
 object TvReport {
     private val DAY = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC)
@@ -235,6 +246,54 @@ object TvReport {
         appendLine("Button map: ${doc?.appKeys?.size?.takeIf { it > 0 }?.let { "$it buttons" } ?: "none"}")
     }
 
+    // 0.4.8: the restart count (Restarts), the same lines in a problem report as in the confirmation (ItWorked). The
+    // issue bot reads "Held:" and "Failed:" (research/release-0.4.8/CONFIRMATION-FORMAT.md); dates are UTC days.
+    private fun StringBuilder.appendRestarts(r: RestartFacts) {
+        val t = r.tally
+        appendLine()
+        appendLine("Restarts")
+        appendLine("Home path: ${r.path.word}")
+        appendLine("Held: ${t.held}")
+        appendLine("Failed: ${t.failed}")
+        appendLine("Last restart: ${when { t.counted == 0 -> "none counted yet"; t.lastFailed -> "failed"; else -> "held" }}")
+        appendLine("First counted: ${t.firstAtMs?.let { DAY.format(Instant.ofEpochMilli(it)) } ?: "none"}")
+        appendLine("Last counted: ${t.lastAtMs?.let { DAY.format(Instant.ofEpochMilli(it)) } ?: "none"}")
+        appendLine("Counted by: ${t.build?.let { v(it) } ?: "none"}")
+        appendLine("Look route: ${r.lookRoute}")
+        appendLine("Checked: ${if (r.path == HomePath.HELPER) "boot_id and Home only (the helper's service is not read)" else "boot_id and Home only"}")
+    }
+
+    // 0.4.8 (PLAN item 2): "Tell us it worked", the confirmation the issue bot counts. A fixed block of the app, the
+    // build kind, the phone, the TV's facts, how its home screen resolved and the restart count; no package list, no
+    // log, and nothing the problem report leaves out either (no serial, no id, no name, no address, no Wi-Fi, no key).
+    // The format is research/release-0.4.8/CONFIRMATION-FORMAT.md; change both together.
+    fun confirmation(about: AppAbout, input: TvReportInput, restarts: RestartFacts): String = buildString {
+        val s = input.snapshot
+        val f = s.facts
+        appendLine("Clean Your TV: confirmation")
+        appendLine("Format: ${ItWorked.FORMAT}")
+        appendHeaderOnly(about)
+        appendLine("Build kind: ${about.buildKind}")
+        appendLine("Phone: ${v(about.phoneLine)}")
+        appendLine()
+        appendLine("TV")
+        appendLine("Brand: ${v(f.brand)}")
+        appendLine("Manufacturer: ${v(f.manufacturer)}")
+        appendLine("Model: ${v(f.model)}")
+        appendLine("Device: ${v(f.device)}")
+        appendLine("Android: ${v(f.release)} (SDK ${f.sdk})")
+        appendLine("Build: ${Scrub.text(oneLine(f.fingerprint), codes = false).ifEmpty { "unknown" }}")
+        appendLine()
+        appendLine("Home screen")
+        appendLine("Profile: ${LogCodes.profile(input.profile)}")
+        appendLine("Home switch: ${input.home?.line?.removePrefix("home switch ") ?: "not recorded"}")
+        appendRestarts(restarts)
+    }.trimEnd() + "\n"
+
+    private fun StringBuilder.appendHeaderOnly(about: AppAbout) {
+        appendLine("App: ${v(about.appLine)}")
+    }
+
     private fun StringBuilder.appendHeader(about: AppAbout) {
         appendLine("App: ${v(about.appLine)}")
         appendLine("Phone: ${v(about.phoneLine)}")
@@ -277,6 +336,7 @@ object TvReport {
                 tv.cleanyour.core.model.SettingKey.ACCESSIBILITY_ENABLED in s.settings || tv.cleanyour.core.spec.HomeHelperKeys.redirectOf(s.launcherOverlay) != null)) {
             appendAccessibility(s)
         }
+        input.restarts?.let { appendRestarts(it) }
         val system = s.packages.filter { it.value.system }.toSortedMap(compareBy { it.value })
         val others = s.packages.size - system.size
         appendLine()
@@ -480,6 +540,17 @@ object IssueLinks {
         input?.let { "tv" to "${TvReport.tvName(it.snapshot)}, ${TvReport.androidLine(it.snapshot)} (${TvReport.platformOf(it.snapshot)})" },
         context?.let { "what" to what(it, redact) },
     ), PROBLEM_REPORT_FIELD, report)
+
+    // 0.4.8: "Tell us it worked", the confirmation form (.github/ISSUE_TEMPLATE/confirmation.yml) with its title and the
+    // block (TvReport.confirmation) in its one box. The block is short (about 700 characters), well inside MAX_URL.
+    const val CONFIRMATION_FIELD = "confirmation"
+
+    fun confirmation(input: TvReportInput, block: String): Link = link("confirmation.yml", listOf(
+        "title" to confirmationTitle(input),
+    ), CONFIRMATION_FIELD, block)
+
+    // "Confirmation: Xiaomi MiTV-AXSO0 (dangal, Android 9)": the same TV key as a problem's title (TvReport.tvKey).
+    fun confirmationTitle(input: TvReportInput): String = "${ItWorked.TITLE_PREFIX}${TvReport.tvKey(input.snapshot)}"
 
     fun problemTitle(input: TvReportInput?, context: ReportContext? = null, redact: (String) -> String = { it }): String = when {
         context?.connect == true -> "Problem: could not connect (${TvReport.said(context.error ?: "unknown", redact, 60)})"

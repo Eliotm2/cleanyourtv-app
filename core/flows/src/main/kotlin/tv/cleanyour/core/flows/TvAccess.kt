@@ -181,5 +181,26 @@ class TvAccess(
         return hit
     }
 
-    private fun current(tvId: TvId, fallback: Tv): Tv = tvs.tvs.value.firstOrNull { it.id == tvId } ?: fallback
+    // 0.4.8 (PLAN item 4): Manage's own reconnect, after the TV restarted or the app came back, so "Offline" no longer
+    // waits for a tap on Reconnect. Only the saved addresses whose port 5555 answers, and only the known-TV handshake
+    // (openKnown, RFC-RECONNECT-1): the app's key signs and nothing more, so a TV that no longer takes it shows no Allow
+    // dialog, a different TV is never connected, and neither the debugging step nor any other sheet shows on the phone.
+    // Null when the TV did not answer that way; Reconnect stays the person's way in then.
+    suspend fun quiet(tvId: TvId): TvSession? {
+        live(tvId)?.let { return it }
+        val tv = tvs.tvs.value.firstOrNull { it.id == tvId } ?: return null
+        val net = discovery.network().value
+        if (!net.onWifi || (tv.lastSubnet != null && net.subnet != null && net.subnet != tv.lastSubnet)) return null
+        for (endpoint in tv.endpoints.filterIsInstance<Endpoint.PlainTcp>()) {
+            if (!attempt { discovery.probe5555(endpoint.host) }.getOrDefault(false)) continue
+            val r = attempt { sessions.openKnown(endpoint, tvId) }.getOrNull()
+            if (r is OpenResult.Ok) {
+                tvs.upsert(current(tvId, tv).copy(lastSeenAt = clock.nowMs(), debugging = DebugState.ON, lastSubnet = net.subnet ?: tv.lastSubnet))
+                return r.session
+            }
+        }
+        return null
+    }
+
+    private fun current(tvId: TvId, fallback: Tv): Tv =tvs.tvs.value.firstOrNull { it.id == tvId } ?: fallback
 }
