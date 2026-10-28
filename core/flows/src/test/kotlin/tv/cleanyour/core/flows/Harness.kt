@@ -171,6 +171,7 @@ class Harness(val clock: FakeClock = FakeClock(Samples.NOW_MS), val facts: tv.cl
         cardDetector = CardAnswerDetector { _, _ -> cardAnswer }, sessionEnd = sessionEnd, homePrefs = HomePrefs(documents),
         appPrefs = AppPrefs(documents), keyInfo = keyInfo, updates = updates, diagnostics = diagnostics,
         clock = clock, copy = KeyCopy, encoder = encoder, store = store, appVersion = about.version, about = about,
+        log = FlowLog { logLines += it },
     )
 
     // A TV this phone already set up, connected, with a stored snapshot.

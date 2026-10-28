@@ -37,6 +37,9 @@ data class TvCard(
     // 0.4.6: on this connect a setup wizard claims Home while ours is Home and the TV's own home
     // screen is off (WizardHome); Manage offers to switch the TV's own home screen back on.
     val wizardHome: Boolean = false,
+    // 0.4.7: on this connect the TV's own home screen, which this phone switched off, claims Home again
+    // (StockHomeBack: XGIMI's remote buttons switch launcherx back on).
+    val stockHomeBack: Boolean = false,
 )
 
 data class ManageState(
@@ -78,10 +81,11 @@ class ManageMachine(
     private data class Thumb(val tvId: TvId, val png: ByteArray?)
     private data class Reconnected(val ok: Boolean)
     private data object Reconnecting
-    private data class WizardHomeRead(val tvId: TvId, val applies: Boolean)
+    private data class WizardHomeRead(val tvId: TvId, val applies: Boolean, val stockBack: Boolean = false)
     private data class SwitchingHome(val on: Boolean)
     // 0.4.6: what the last connect read of each TV's Home said (WizardHome), for the cards.
     private val wizardHomes = java.util.concurrent.ConcurrentHashMap<TvId, Boolean>()
+    private val stockBacks = java.util.concurrent.ConcurrentHashMap<TvId, Boolean>()   // 0.4.7 (StockHomeBack)
 
     init {
         scope.launch {
@@ -109,6 +113,7 @@ class ManageMachine(
                         betterBackOn = if (PutBackAdvice.forProfile(tv.profileId).isEmpty()) 0
                             else PutBackAdvice.offers(tv.profileId, latest, d.ledger.changes(tv.id), d.profileOf(tv)).map { it.pkg }.distinct().count { it in offPkgs },
                         wizardHome = wizardHomes[tv.id] == true,
+                        stockHomeBack = stockBacks[tv.id] == true,
                     )
                 }
                 send(Loaded(cards))
@@ -129,10 +134,15 @@ class ManageMachine(
         val tv = d.tv(id) ?: return
         val home = attempt { d.prober.homeNow(s) }.getOrNull() ?: return
         val profile = d.profileOf(tv)
-        val stock = WizardHome.stockOf(d.ledger.changes(id), profile)
+        val changes = d.ledger.changes(id)
+        val stock = WizardHome.stockOf(changes, profile)
         val applies = WizardHome.applies(home, attempt { d.snapshots.latest(id) }.getOrNull(), profile, stock)
+        val back = StockHomeBack.applies(home, changes, stock)
         wizardHomes[id] = applies
-        send(WizardHomeRead(id, applies))
+        if (back && stockBacks[id] != true) d.log.line("manage: the TV's own home screen is on again after this app switched it off, " +
+            if (home.resolved?.pkg == stock?.pkg) "and Home answers to it" else "Home answers to ${if (home.resolved?.pkg == Launcher.pkg) "ours" else "another"}")
+        stockBacks[id] = back
+        send(WizardHomeRead(id, applies, back))
     }
 
     // "Switch it back on": the existing undo of the switch (Use the TV's own home screen), then Home
@@ -168,7 +178,7 @@ class ManageMachine(
         is ManageIntent.Select -> state.copy(selected = event.tvId)
         is Thumb -> state.copy(cards = state.cards.map { if (it.id == event.tvId && event.png != null) it.copy(thumbnail = event.png) else it })
         Reconnecting -> state.copy(reconnecting = true)
-        is WizardHomeRead -> state.copy(cards = state.cards.map { if (it.id == event.tvId) it.copy(wizardHome = event.applies) else it })
+        is WizardHomeRead -> state.copy(cards = state.cards.map { if (it.id == event.tvId) it.copy(wizardHome = event.applies, stockHomeBack = event.stockBack) else it })
         is SwitchingHome -> state.copy(switchingHome = event.on)
         is Reconnected -> state.copy(reconnecting = false, offline = !event.ok && state.offline)
         else -> state

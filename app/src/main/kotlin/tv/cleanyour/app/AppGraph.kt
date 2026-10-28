@@ -220,6 +220,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         store = store.rules,       // STORES-PLAN 1
         about = about, homeDecisions = homeDecisions,   // 0.3.2 B1, B2
         redact = Redactor::redact,                      // 0.4.6: what a card puts into a problem report
+        log = FlowLog { CytLog.i(it) },                 // 0.4.7: Manage's re-check lines (StockHomeBack)
     )
 
     init {
