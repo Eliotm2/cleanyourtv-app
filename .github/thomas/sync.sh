@@ -20,8 +20,9 @@ launcher_before=$(git rev-parse HEAD:third_party/cleanyourtv)
 git merge --no-ff --no-commit "$latest" || true
 
 # The upstream workflows stay out of the fork (they sign and publish with upstream's secrets).
-for f in $(git ls-files .github/workflows); do
-  [ "$f" = .github/workflows/thomas-sync.yml ] || git rm -q --force "$f"
+# ls-files lists a conflicted file once per stage, hence sort -u; --ignore-unmatch for a file already gone.
+for f in $(git ls-files .github/workflows | sort -u); do
+  [ "$f" = .github/workflows/thomas-sync.yml ] || git rm -q --force --ignore-unmatch "$f"
 done
 
 if ! version=$(python3 .github/thomas/version.py "$latest" 2>&1); then
