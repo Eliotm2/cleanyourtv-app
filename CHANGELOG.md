@@ -2,6 +2,57 @@
 
 All notable changes to the app. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.4.7 (unreleased)
+
+### When the TV keeps its own home screen
+- "What we found" now says first whether the TV keeps its own home screen, with the reason in one
+  line and "Why" for the whole story and what would change it. It was a banner at the bottom, under
+  the button, before.
+- Customise no longer offers the dock and the look on a TV that keeps its own home screen (neither
+  reached the TV), and says in its own words why the setup wizard and the TV's home screen stay.
+  "Show the progress on the TV" no longer promises the new home screen, and is not offered where
+  the TV cannot run it.
+- Done leads with the outcome ("Clean-up done", "the TV keeps its own home screen, so it will look
+  the same"), offers no card to add there, and after a restart says the home screen is the TV's
+  own. The restart is recommended for the setup wizard only when the switch ran.
+- With nothing to switch off and the TV keeping its own home screen, "Make it clean" is gone: Done
+  ends Setup without a run, and a TV with no list offers "Help add this TV".
+- "Making it clean" no longer says we will buzz when it is time to look at the TV when no home
+  screen check comes.
+- Switching PatchWall off or on in Customise says when that brings the new home screen back into
+  the plan, or takes it out.
+- The reasons and the words are the same on every screen: "the TV's own home screen" (never "the
+  old home screen"), "switch", "Run Setup again" and "open Home screen for this TV". A TV that
+  refuses other home screens is named by its brand, never by the name you gave it. Fire TV's keep
+  list no longer mentions Chromecast.
+
+### After a failed switch
+- The Home screen page says the new home screen is installed but not in use, and "Try the switch
+  again" runs Setup once more; the dock and the look wait until it is in use. Manage's Home screen
+  row says the TV's own is in use. The cards and Done no longer point at a retry "from Manage".
+- The Wi-Fi card (the setup wizard saved the TV's Wi-Fi) now keeps the TV's own home screen first,
+  and tries again only once you say you have forgotten the saved networks. Its advice is the one
+  that works: forget every saved Wi-Fi network, then join yours again; a cable alone does not help.
+- A look that did not reach the TV while the switch held is said on Done, and the choice is kept
+  for the Look sheet. In Manage, a look send that paused keeps the draft, and its card says "Your
+  look didn't reach the TV" with "Send it again" and "Undo".
+
+### Reports
+- "Help add this TV" remembers that this TV's report was sent and when, on the report screen, on
+  Manage and on the Home screen page, and keeps the issue's link once you paste it. Sending again
+  stays one tap away.
+- On a TV whose home screen was kept on purpose, the Home screen page says this is by design
+  before "Report a problem", with a link to the TV list page.
+- Copy that assumed a GitHub issue ("ask us in your issue") now says "tell us with Report a problem".
+
+### Elsewhere
+- Restore point no longer asks whether to keep or remove the new home screen on a TV where it was
+  never installed, and offers "Before a factory reset" only when this app switched the setup wizard
+  off.
+- Manage shows "Run Setup again" for every TV. The Custom level note no longer mentions the dock
+  and the look.
+- README: a "What your TV gets" section near the top, with the TV list page.
+
 ## 0.4.6 (2026-10-28)
 
 ### Home screen
