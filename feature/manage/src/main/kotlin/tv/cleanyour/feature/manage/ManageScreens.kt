@@ -242,29 +242,6 @@ private fun RestartsBanner(r: tv.cleanyour.core.flows.RestartTally, onIntent: (M
     }
 }
 
-// M1a: the debugging step for a returning write; it advances on its own when the port opens
-// (UX 4.3). The app lays it over whatever screen asked (TvAccess.reach).
-@Composable
-fun DebugStepSheet(reach: Reach, onCancel: () -> Unit) {
-    val name = when (reach) {
-        is Reach.NeedsDebugging -> reach.tvName
-        is Reach.Connecting -> reach.tvName
-        is Reach.AwaitingAllow -> reach.tvName
-        is Reach.WrongNetwork -> reach.tvName
-        Reach.Idle -> return
-    }
-    CytBottomSheet(onCancel) { DebugStepContent(name, connecting = reach is Reach.Connecting, onCancel) }
-}
-
-@Composable
-internal fun ColumnScope.DebugStepContent(tvName: String, connecting: Boolean, onCancel: () -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) { TvStatusChip(tvName, TvStatus.WAITING) }
-    StepCard(stringResource(R.string.debugstep_title), stringResource(R.string.debugstep_body), Modifier.padding(top = 16.dp))
-    Body(stringResource(R.string.debugstep_note), Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp))
-    LiveLine(stringResource(if (connecting) R.string.debugstep_connecting else R.string.debugstep_waiting))
-    TertiaryButton(stringResource(R.string.action_cancel), onCancel, Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp), quiet = true)
-}
-
 // A Manage write that paused left its run open (R5-W8 O2): every later write on that TV would be
 // refused, so the app lays this card over whatever screen asked. A setup run opens the wizard's
 // resume card instead, which owns the home screen check.
@@ -497,8 +474,11 @@ internal fun ColumnScope.ForgetContent(tvName: String, onIntent: (TvSettingsInte
 
 // M8 App settings (D12, F2, F13). The Reset my key confirmation is FLAG_SECURE (D35, set by the app).
 @Composable
-fun AppSettingsScreen(state: AppSettingsState, onIntent: (AppSettingsIntent) -> Unit, onBack: () -> Unit, onOpenRelease: () -> Unit, modifier: Modifier = Modifier) {
+// RFC-REACH-1: `details` and `onDetails` drive "Connection details" (the app collects and copies or shares the block).
+fun AppSettingsScreen(state: AppSettingsState, onIntent: (AppSettingsIntent) -> Unit, onBack: () -> Unit, onOpenRelease: () -> Unit, modifier: Modifier = Modifier,
+    details: DetailsUi = DetailsUi(), onDetails: (share: Boolean) -> Unit = {}) {
     var licences by rememberSaveable { mutableStateOf(false) }
+    var connection by rememberSaveable { mutableStateOf(false) }
     var privacy by rememberSaveable { mutableStateOf(false) }
     ScreenScaffold(Glow.Tv, modifier, topBar = { CytTopBar(onBack = onBack) }) {
         ScreenTitle(stringResource(R.string.appsettings_title), titleTop)
@@ -546,6 +526,9 @@ fun AppSettingsScreen(state: AppSettingsState, onIntent: (AppSettingsIntent) -> 
             ListDivider()
             ListRow(stringResource(R.string.appsettings_report), subtitle = stringResource(R.string.appsettings_report_note),
                 onClick = { onIntent(AppSettingsIntent.ReportProblem) })
+            ListDivider()
+            ListRow(stringResource(R.string.appsettings_details), subtitle = stringResource(R.string.appsettings_details_note),
+                onClick = { connection = true })
         }
         ListGroup(Modifier.padding(top = 12.dp, bottom = 24.dp)) {
             ListRow(stringResource(R.string.appsettings_reset_key), subtitle = stringResource(R.string.appsettings_reset_key_note),
@@ -557,6 +540,7 @@ fun AppSettingsScreen(state: AppSettingsState, onIntent: (AppSettingsIntent) -> 
     }
     if (licences) CytBottomSheet({ licences = false }) { LicencesContent() }
     if (privacy) CytBottomSheet({ privacy = false }) { PrivacyContent(online = state.updateCheck || state.addOns) }
+    if (connection) CytBottomSheet({ connection = false }) { DetailsContent(details, onDetails) }
     state.confirm?.let { what ->
         CytBottomSheet({ onIntent(AppSettingsIntent.CancelConfirm) }) { ConfirmContent(what, state.working, onIntent) }
     }

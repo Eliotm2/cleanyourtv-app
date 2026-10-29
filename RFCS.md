@@ -172,3 +172,27 @@ Frozen signatures grow, nothing is removed:
 
 Not done, by decision: TCL's AUTO_START app-op, button mapping (app_keys), a probe of
 `dumpsys accessibility` (the snapshot's two settings and the overlay give Manage's states).
+
+## RFC-REACH-1: the network is a hint, not a gate; the debugging step says which case it is
+
+A user on 0.4.6.1 waited for good at "Waiting for the TV..." with USB debugging on and the phone on
+Wi-Fi. D19 detects a different network by link subnet, and `TvAccess` used that as a gate: when the
+phone's subnet was not the TV's `lastSubnet` (a new or reset router, a mesh node or band on another
+subnet, a guest network) the step showed `WrongNetwork` and neither probed the saved addresses nor
+searched the network (RFC-RECONNECT-1), and `quiet()` gave up the same way. The TvId check (D37:
+`open` and `openKnown` with the expected TvId) is what keeps a different TV out, so the gate bought
+no safety. Change: on any Wi-Fi the saved addresses are probed and the network searched; only a
+phone that is not on Wi-Fi is `WrongNetwork`; a TV reached on a new network saves it as
+`lastSubnet`. The subnet stays a D19 hint, shown to the person. Additive, no frozen signature
+changes: `TvAccess.check` (a `StateFlow<ReachCheck>`, the live "What the app sees" rows, `Seen`
+per row) and `TvAccess.lastHandshake(tvId)`; one log line per change of state (fixed words and
+counts, never an address or a subnet). The sheet (`DebugStepSheet`, now in `ReachSheet.kt`) has its
+own copy for not on Wi-Fi, the Allow prompt and debugging off, "Show details" with the rows, a hint
+after 30 s with nothing found, "Report a problem" (`ReportContext` case `REACH_<STATE>`) and "Copy
+connection details". That block (`ConnectionDetails`, made when asked for, also from App settings)
+has the phone's network kinds (`PhoneNetwork`, read by the app from ConnectivityManager with
+ACCESS_NETWORK_STATE only), each saved TV's addresses cut to their last part with port 5555 and the
+known-TV handshake, a fresh 10 s search, the last 40 "access:" lines and the step's state. It keeps
+RFC-RECONNECT-1's rules: `openKnown` only, so no Allow dialog on any TV, and it saves nothing.
+`ManageDeps` gets `phoneNetwork` (with a default). Not done: "Enter the TV's address" on the sheet,
+as the address entry lives in Setup's machine (S1c) and is not reachable from a returning write.

@@ -68,6 +68,8 @@ import tv.cleanyour.feature.connect.isConnectState
 import tv.cleanyour.feature.launcher.HomeScreen
 import tv.cleanyour.feature.manage.AppSettingsScreen
 import tv.cleanyour.feature.manage.DebugStepSheet
+import tv.cleanyour.feature.manage.DetailsUi
+import tv.cleanyour.feature.manage.reachCase
 import tv.cleanyour.feature.manage.LeftoversScreen
 import tv.cleanyour.feature.manage.ManageScreen
 import tv.cleanyour.feature.manage.OpenWriteSheet
@@ -206,6 +208,23 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
         context.startActivity(Intent.createChooser(send, null))
     }
 
+    // RFC-REACH-1: "Copy connection details" (the debugging step, App settings): made when asked for, about 10 s, then
+    // copied, and with Share also handed to the share sheet. One at a time.
+    var details by remember { mutableStateOf(DetailsUi()) }
+    fun collectDetails(andShare: Boolean) {
+        if (details.busy) return
+        details = DetailsUi(busy = true)
+        scope.launch {
+            val text = runCatching { withContext(Dispatchers.IO) { graph.manageDeps.connectionDetails() } }
+                .onFailure { CytLog.w("connection details not made", it) }.getOrNull()
+            if (text != null) {
+                copyText(context, text, label = "connection details")
+                if (andShare) runCatching { share(text) }
+            }
+            details = DetailsUi(copied = text != null)
+        }
+    }
+
     val undoLabel = androidx.compose.ui.res.stringResource(tv.cleanyour.feature.manage.R.string.action_undo)
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     // 0.4.0 "Your photo" on the Look sheet: the system photo picker, images only, no permission.
@@ -341,7 +360,8 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
                     LaunchedEffect(m) { m.effects.collect { onManageEffect(it) } }
                     SecureWindow(state.confirm == AppConfirm.RESET_KEY)
                     AppSettingsScreen(state, m::dispatch, onBack = { go("back") },
-                        onOpenRelease = { graph.store.releasePage?.let { url -> scope.launch { onManageEffect(ManageEffect.OpenUrl(url)) } } })
+                        onOpenRelease = { graph.store.releasePage?.let { url -> scope.launch { onManageEffect(ManageEffect.OpenUrl(url)) } } },
+                        details = details, onDetails = { collectDetails(it) })
                 }
             },
         )
@@ -358,8 +378,18 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
                 })
         }
         // M1a: any returning write that finds port 5555 closed shows the debugging step here.
+        // RFC-REACH-1: the sheet says which case it is, with "What the app sees", the connection details and a report.
         val reach by graph.access.reach.collectAsStateWithLifecycle()
-        if (reach !is Reach.Idle) DebugStepSheet(reach) { graph.access.cancelWaiting() }
+        val reachCheck by graph.access.check.collectAsStateWithLifecycle()
+        SecureWindow(reach is Reach.AwaitingAllow)   // D35: the sheet shows the end of the key's fingerprint
+        if (reach !is Reach.Idle) DebugStepSheet(reach, onCancel = { graph.access.cancelWaiting() }, check = reachCheck,
+            onReport = { title ->
+                val r = reach
+                val tvId = when (r) { is Reach.NeedsDebugging -> r.tvId; is Reach.AwaitingAllow -> r.tvId; is Reach.WrongNetwork -> r.tvId; is Reach.Connecting -> r.tvId; Reach.Idle -> null }
+                val name = graph.tvs.tvs.value.firstOrNull { it.id == tvId }?.nickname
+                go(IssueRoute.of(tvId, ReportContext("Manage", ReportContext.named(title, name), reachCase(r), error = reachCheck.summary())))
+            },
+            details = details, onDetails = { collectDetails(it) })
         SnackbarHost(snack, Modifier.align(Alignment.BottomCenter).padding(16.dp))
     }
 }
