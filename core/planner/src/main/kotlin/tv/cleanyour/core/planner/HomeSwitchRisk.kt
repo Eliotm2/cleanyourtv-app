@@ -86,8 +86,8 @@ object HomeSwitchRisk {
     // placeholders) and every incident block (VENDOR_HOME, OTHER_HOME, PATCHWALL_FEEDS, HELD_OUT, candidates never
     // with R0) apply to every entry. The test build drops the table (ANY_BRAND_BUILD) and keeps the rest.
     //
-    // Graduation rule (owner, 2026-10-28): a brand on an Android version already proven for it needs 2 confirmed
-    // testers; a new Android version for a brand needs 3. A confirmation is the tester's own words that the new home
+    // Graduation rule (owner, 2026-10-28; 2026-10-29: 2 for a new Android version too, it was 3): a brand on an
+    // Android version needs 2 confirmed testers. A confirmation is the tester's own words that the new home
     // screen was still there after a restart of the TV, on a test build. Each entry cites its confirming issues.
     data class Graduated(val makers: Set<String>, val sdks: IntRange, val models: Set<String> = emptySet(),
                          val excludedDevices: Set<String> = emptySet(), val why: String) {
@@ -102,9 +102,8 @@ object HomeSwitchRisk {
         // MSSP0 on 9, AESP0 on 10, MOOQ1, MOOQ3 and AYFR0 on 11 (issues #1119, #1279 among them) and upstream's AXFR0
         // and AXFR1 on 11. The MiTV-AXSO2 (dangalUHD) on 11 is held out in every build (HELD_OUT, issue #945).
         Graduated(XIAOMI_MAKERS, 28..30, why = "Xiaomi and Redmi, Android 9 to 11 (0.4.6)"),
-        // Not yet: Xiaomi MiTV-MZTU1 (stepup) on Android 14. A new Android version for Xiaomi needs 3 testers who
-        // said the home screen stayed after a restart; #1505 (beta3) said so, #1117 and #868 (beta2) said it works
-        // without a restart. R0-GRADUATION.md has the entry to add when a third confirms.
+        // Not yet: Xiaomi MiTV-MZTU1 (stepup) on Android 14. It needs 2 testers who said the home screen stayed
+        // after a restart; #1505 (beta3) said so, #868 counts too (confirmations.md). R0-GRADUATION.md has the entry.
     )
 
     // The release's R0 scope: a graduated entry covers the TV.
