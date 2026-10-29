@@ -9,8 +9,8 @@ android {
     // 0.4.6.1 is the reconnect hotfix on 0.4.6 (four parts). It takes versionCode 23 because 22 is the
     // 0.4.7-beta1 test build signed with the same key, so a phone with that build never sees a downgrade.
     defaultConfig {
-        versionCode = 26
-        versionName = "0.4.6.1-thomas.1"   // fork (Thomas): upstream 0.4.6.1 plus the fork's own changes
+        versionCode = 27
+        versionName = "3.2-thomas.1"   // fork (Thomas): <launcher version>-thomas.N, the launcher it bundles plus the fork's changes
     }
     // STORES-PLAN 1: one codebase, two store builds, the same applicationId and signing certificate.
     // `full` (GitHub and F-Droid) checks GitHub for a newer release and offers the optional add-ons;

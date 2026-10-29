@@ -1,8 +1,10 @@
 # Fork (Thomas): every night, take the latest release of the original app
-# (udhaykumarbala/cleanyourtv-app), merge it into `thomas`, run the tests, build the APK signed
-# with the fork's key and publish it as a release of this repository. The app's "Check for
-# updates" reads those releases. When the merge needs a person (a conflict, a new launcher),
-# nothing is pushed and an issue says why.
+# (udhaykumarbala/cleanyourtv-app) and the latest launcher release of the fork (Eliotm2/cleanyourtv,
+# made half an hour earlier by its thomas-launcher.yml from the original launcher), merge and bundle
+# them into `thomas` with our additions, number the app after its launcher (<launcher>-thomas.N), run
+# the tests, build the APK signed with the fork's key and publish it as a release of this repository.
+# The app's "Check for updates" reads those releases. When the merge needs a person, nothing is
+# pushed and an issue says why.
 #
 # Secrets (Settings > Secrets and variables > Actions):
 #   KEYSTORE_B64         the keystore (accueil.jks), base64
@@ -87,15 +89,15 @@ jobs:
       - name: Commit, push and publish
         if: steps.sync.outputs.new == 'true'
         env:
-          TAG: ${{ steps.sync.outputs.tag }}
           VERSION: ${{ steps.sync.outputs.version }}
+          NOTES: ${{ steps.sync.outputs.notes }}
           APK: ${{ steps.apk.outputs.path }}
         run: |
           rm -f keystore.properties
-          git commit -q -m "Fork Thomas $VERSION : reprise de $TAG (automatique)"
+          git commit -q -m "Fork Thomas $VERSION : reprise automatique ($NOTES)"
           git push origin HEAD:thomas
-          gh release create "$VERSION" "$APK" --target thomas --title "$VERSION" \
-            --notes "Reprise automatique de [$TAG](https://github.com/udhaykumarbala/cleanyourtv-app/releases/tag/$TAG) avec les ajouts de Thomas. Signée avec la clé du fork : elle s'installe par-dessus la version précédente."
+          gh release create "$VERSION" "$APK" --target "$(git rev-parse HEAD)" --title "$VERSION" \
+            --notes "Reprise automatique ($NOTES) avec les ajouts de Thomas. Signée avec la clé du fork : elle s'installe par-dessus la version précédente."
 
       - name: Say why it stopped
         if: always() && (steps.sync.outputs.code == '2' || failure())

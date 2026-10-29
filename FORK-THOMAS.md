@@ -1,9 +1,13 @@
 # Fork « thomas » de l'appli téléphone Clean Your TV
 
 Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.6.1, MIT).
-Identifiant d'appli `fr.thomas.cleanyourtv` (amont : `tv.cleanyour.app`), nom « Clean Your TV · Thomas », versions
-`<amont>-thomas.N` (0.4.6.1-thomas.1 à la reprise de la 0.4.6.1) : elle s'installe à côté de l'appli d'origine, qui garde
-son propre point de restauration.
+Identifiant d'appli `fr.thomas.cleanyourtv` (amont : `tv.cleanyour.app`), nom « Clean Your TV · Thomas ». Elle s'installe
+à côté de l'appli d'origine, qui garde son propre point de restauration.
+
+**Numéro** (depuis le 29/10/2026) : `<version du launcher amont embarqué>-thomas.N`, par exemple 3.2-thomas.1 = appli
+avec notre launcher repris du launcher 3.2 de Gathin23. N avance à chaque nouvelle version (appli amont reprise, launcher
+repris, ou changement à nous) et repart à 1 quand le launcher amont change. Les versions d'avant étaient numérotées sur
+l'appli amont (0.4.6.1-thomas.1) ; 3.x passe devant, la mise à jour est donc proposée.
 
 ## Ce que le fork change
 
@@ -56,10 +60,12 @@ On ne retire un ajout qu'après l'essai de Thomas sur la télé.
 
 `.github/workflows/thomas-sync.yml`, chaque nuit (01:37 UTC) et à la demande (Actions › « Run workflow ») :
 
-1. `.github/thomas/sync.sh` fusionne la dernière release amont dans `thomas`. `.github/thomas/version.py` règle seul le
-   conflit de version (`<amont>-thomas.1`, versionCode au-dessus des deux côtés) ; les workflows amont restent dehors.
-2. Il s'arrête et ouvre une issue si un autre conflit reste, ou si la release amont embarque un autre launcher
-   (sous-module `third_party/cleanyourtv` déplacé : notre launcher doit alors être repris à la main, puis épinglé).
+1. `.github/thomas/sync.sh` fusionne la dernière release de l'appli amont dans `thomas` (workflows amont dehors ;
+   épingle et APK du launcher : les nôtres), puis embarque la dernière release `launcher-*` du dépôt du launcher
+   (`Eliotm2/cleanyourtv`, faite chaque nuit à 01:07 par son `thomas-launcher.yml`) : clé, paquet et version vérifiés,
+   `pin-launcher.py` écrit l'APK, `Pins.kt` et `LauncherPinTest`. `.github/thomas/version.py` numérote l'appli
+   `<launcher amont>-thomas.N` et règle le conflit de version.
+2. Il s'arrête et ouvre une issue si un autre conflit reste.
 3. Sinon : tests, APK signé avec la clé du fork (vérifiée), commit, push et release `<version>` avec l'APK.
 
 Secrets du dépôt (Settings › Secrets and variables › Actions) : `KEYSTORE_B64` (le keystore en base64) et
