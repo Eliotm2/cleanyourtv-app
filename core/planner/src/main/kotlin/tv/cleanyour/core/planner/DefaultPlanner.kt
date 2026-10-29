@@ -468,6 +468,7 @@ class DefaultPlanner(
             val rows = switched.map { s ->
                 val pkg = (s.op as Op.Disable).pkg
                 if (s.narration == NARRATION_WIZARD) RowSummary(pkg, NARRATION_WIZARD, DESCRIPTION_WIZARD, off = true, protected = true, whyProtected = REASON_SWITCH_PART)
+                else if (pkg in HomePlaceholder.FACTORY_HOMES_OFF) RowSummary(pkg, name(pkg), DESCRIPTION_FACTORY_HOME, off = true, protected = true, whyProtected = REASON_SWITCH_PART)
                 else RowSummary(pkg, name(pkg), DESCRIPTION_OLD_HOME, off = true, protected = true, whyProtected = REASON_SWITCH_PART)
             }
             val i = groups.indexOfFirst { it.id == GROUP_HOME }
@@ -556,6 +557,14 @@ class DefaultPlanner(
             // D25: the stock launcher is disabled unless the profile keeps it enabled (quirk or
             // never_disable) or the rule keeps it on for this TV's facts (persistent, an input).
             val keepStockEnabled = (profile != null && Quirk.STOCK_LAUNCHER_KEEP_ENABLED in profile.quirks) || !mayGoOff(stock.pkg)
+            // Issue #1944: a factory test app that answers Home and that a tested list switches off
+            // (HomePlaceholder.FACTORY_HOMES_OFF) goes off before the TV's own home screen, as the
+            // MOOQ0 list's header says, unless the clean-up above already does it. At priority 0 it
+            // ties with the new home screen, and with the TV's own home screen off it is what Home
+            // lands on once the new one is gone. Step R switches it back on after the TV's own.
+            val factoryHomes = claimants.map { it.pkg }.distinct().filter {
+                it in HomePlaceholder.FACTORY_HOMES_OFF && it != stock.pkg && !isOff(it) && !planned(Op.Disable(it)) && mayGoOff(it)
+            }
             val token = idGen.runToken()
 
             // Launcher v2.4.0's precondition: the TV's own home screen is left alone unless the new one
@@ -565,6 +574,7 @@ class DefaultPlanner(
             step(Op.StartActivity(launcher, wait = true), null, GROUP_HOME, "Starting the new home screen", FailurePolicy.CONTINUE)
             step(Op.Mkdir(RemoteDir.TMP), null, GROUP_HOME, "Preparing the safety timer", FailurePolicy.CONTINUE)
             val from = step(Op.ArmHomeWatchdog(stock, watchdogSeconds, token), null, GROUP_HOME, "Arming the safety timer", FailurePolicy.STOP_AND_ROLLBACK)
+            for (pkg in factoryHomes) disable(pkg, GROUP_HOME, FailurePolicy.STOP_AND_ROLLBACK, "Switching off ${name(pkg)}, which also answers the Home button")
             if (!keepStockEnabled) disable(stock.pkg, GROUP_HOME, FailurePolicy.STOP_AND_ROLLBACK, "Switching off the TV's own home screen")
             if (wizard != null) disable(wizard, GROUP_HOME, FailurePolicy.STOP_AND_ROLLBACK, NARRATION_WIZARD)
             // WP4 (B5): the prior is the home screen the TV goes back to; never the chooser or a placeholder.
@@ -578,8 +588,7 @@ class DefaultPlanner(
             val rollback: List<Op> = listOfNotNull(
                 Op.ConfirmHome(token), Op.KillWatchdog(token),
                 if (keepStockEnabled) null else Op.Enable(stock.pkg), wizard?.let { Op.Enable(it) },
-                Op.SetHome(stock), Op.VerifyHome(stock), Op.PressHome,
-            )
+            ) + factoryHomes.map { Op.Enable(it) } + listOf(Op.SetHome(stock), Op.VerifyHome(stock), Op.PressHome)
             // Focus on any of these after the HOME key means the takeover did not hold: the TV's
             // own home screens, the setup wizard, the resolver (package android, admitted by
             // PackageName since RFC-W1-2, R1 R-8) and FallbackHome.
@@ -708,10 +717,11 @@ class DefaultPlanner(
         // 0.4.6: a package that may answer Home once it is on again (a switched off package is no
         // claimant, so the snapshot cannot say): Google's and Amazon's TV home screens, the stock
         // launchers of this TV's resolution, the TV's own home the switch armed its watchdog with, a
-        // vendor home, or a claimant the TV still lists.
+        // vendor home, or a claimant the TV still lists. Issue #1944: or a factory test app that
+        // answers Home (HomePlaceholder.isFactoryHome), which ties with the new home screen.
         fun mayClaimHome(pkg: PackageName): Boolean =
             pkg in KnownLaunchers.byPackage || managedStockLaunchers.any { it.pkg == pkg } || HomePlaceholder.stockFromRecords(journals)?.pkg == pkg ||
-                pkg.value in Denylist.vendorHomes || snapshot.home.claimants.any { it.component.pkg == pkg }
+                pkg.value in Denylist.vendorHomes || snapshot.home.claimants.any { it.component.pkg == pkg } || HomePlaceholder.isFactoryHome(pkg)
 
         fun switchOff(pkgs: Set<PackageName>) {
             val rows = mutableListOf<RowSummary>()
@@ -1080,6 +1090,7 @@ class DefaultPlanner(
         const val TITLE_HOME = "Needed for the new home screen"
         const val DESCRIPTION_OLD_HOME = "The old home screen. Switched off only after the new one works."
         const val DESCRIPTION_WIZARD = "We switch it back on if you ever undo or reset the TV."
+        const val DESCRIPTION_FACTORY_HOME = "A factory test app that also answers the Home button. Switched off first, so Home never lands on it."
         const val REASON_SWITCH_PART = "part of the home screen switch; it comes back on if the switch is undone"
         // STORES-PLAN 1 (keepUpdatesOn): the Google Play build keeps the TV's updaters on.
         const val REASON_UPDATES = "it brings the TV's software and security updates, which this version of the app always keeps on"
