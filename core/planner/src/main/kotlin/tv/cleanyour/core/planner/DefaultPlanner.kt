@@ -543,6 +543,8 @@ class DefaultPlanner(
             val claimants = snapshot.home.claimants.map { it.component }
             val stock = StockHome.of(snapshot, stockLaunchers)
             if (stock == null) { refuse("the TV's home screen is not one of the known ones for this model (issue #85)"); return }
+            // Issue #2028: Home answers to a home screen we do not know that Android ranks above ours.
+            if (StockHome.unknownAboveOurs(snapshot, stockLaunchers)) { refuse(REASON_UNKNOWN_HOME_ABOVE); return }
             // Never a section around a Fire OS home: its switch-off and its step R Enable are both refused.
             if (FireOs.isHome(stock.pkg)) { refuse(REASON_TV_REFUSES_HOME); return }
             // What the engine allows inside the open switch (SwitchOffRule), for the same facts.
@@ -1068,6 +1070,8 @@ class DefaultPlanner(
         const val REASON_OLD_ANDROID = "the new home screen needs Android 8 or newer, and this TV has an older Android"
         const val REASON_WIZARD_WHILE_OURS = "on this TV the first-run setup wizard takes the Home button back; use the TV's own home screen first"
         const val REASON_HOME_SCREEN = "it is the TV's own home screen; only the home screen switch changes it"
+        // Issue #2028: Home answers to a home screen we do not know, ranked above ours (StockHome.unknownAboveOurs).
+        const val REASON_UNKNOWN_HOME_ABOVE = "the TV's home screen is not one of the known ones, and the TV ranks it above the new one, so the switch could never take Home (issue #2028)"
         // Issue #2: Fire OS and the China-market TCL firmware take no other home screen.
         const val REASON_TV_REFUSES_HOME = "this TV only allows its own home screen, so the new one is not installed and the switch is not possible"
         const val REASON_FIRE_OS_HOME = "it is Fire OS's own home screen, which Fire OS never lets anyone switch off"
