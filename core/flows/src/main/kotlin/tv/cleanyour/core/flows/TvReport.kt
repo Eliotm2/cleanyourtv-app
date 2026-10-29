@@ -193,7 +193,7 @@ object TvReport {
         if (input != null) appendTv(input, Packages.NONE, names) else { appendLine(); appendLine("TV: none read yet") }
         appendLine()
         appendLine("Diagnostics log (addresses, serial numbers, keys and codes removed)")
-        append(if (context?.connect == true) log.trimEnd().lines().joinToString("\n") { ConnectErrorSummary.redact(it) } else log.trimEnd())
+        append(if (context?.connect == true) log.trimEnd().lines().joinToString("\n") { ConnectErrorSummary.redact(it, about.version) } else log.trimEnd())
     }.trimEnd() + "\n"
 
     // One value from a card, on one line, at most `max` characters, masked twice.
@@ -258,7 +258,7 @@ object TvReport {
         appendLine("Last restart: ${when { t.counted == 0 -> "none counted yet"; t.lastFailed -> "failed"; else -> "held" }}")
         appendLine("First counted: ${t.firstAtMs?.let { DAY.format(Instant.ofEpochMilli(it)) } ?: "none"}")
         appendLine("Last counted: ${t.lastAtMs?.let { DAY.format(Instant.ofEpochMilli(it)) } ?: "none"}")
-        appendLine("Counted by: ${t.build?.let { v(it) } ?: "none"}")
+        appendLine("Counted by: ${t.build?.let { own(it) } ?: "none"}")
         appendLine("Look route: ${r.lookRoute}")
         appendLine("Checked: ${if (r.path == HomePath.HELPER) "boot_id and Home only (the helper's service is not read)" else "boot_id and Home only"}")
     }
@@ -291,11 +291,11 @@ object TvReport {
     }.trimEnd() + "\n"
 
     private fun StringBuilder.appendHeaderOnly(about: AppAbout) {
-        appendLine("App: ${v(about.appLine)}")
+        appendLine("App: ${own(about.appLine)}")
     }
 
     private fun StringBuilder.appendHeader(about: AppAbout) {
-        appendLine("App: ${v(about.appLine)}")
+        appendLine("App: ${own(about.appLine)}")
         appendLine("Phone: ${v(about.phoneLine)}")
     }
 
@@ -389,7 +389,7 @@ object TvReport {
     // beta3: " (from an earlier Setup: 0.3.7, brand set TCL)", or without the version and list when
     // the decision is older than beta3 and names neither.
     private fun earlierNote(d: HomeDecision?): String {
-        val with = listOfNotNull(d?.app?.let { v(it) }, d?.profile?.let { v(it) })
+        val with = listOfNotNull(d?.app?.let { own(it) }, d?.profile?.let { v(it) })
         return " (from an earlier Setup${if (with.isEmpty()) "" else ": " + with.joinToString(", ")})"
     }
 
@@ -447,6 +447,10 @@ object TvReport {
 
     // A TV-provided value, on one line, masked (LogCodes.clean) and never empty.
     private fun v(s: String): String = LogCodes.clean(s, 120).ifEmpty { "unknown" }
+
+    // The app's own words about a build ("0.4.6.1 (full)"): `v` took a four-part version for an
+    // address, so its version is kept as it is and the rest masked like a TV's value (OwnVersion).
+    private fun own(s: String): String = OwnVersion.field(s) { v(it) }.ifEmpty { "unknown" }
 
     // The home screen the TV came with, for the tv_support form's "platform" field, from the TV's own
     // packages and facts (never from a profile: the TVs that need a report have none). A guess, so
