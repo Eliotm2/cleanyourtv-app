@@ -226,6 +226,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         redact = Redactor::redact,                      // 0.4.6: what a card puts into a problem report
         log = FlowLog { CytLog.i(it) },                 // 0.4.7: Manage's re-check lines (StockHomeBack)
         restarts = restarts,                            // 0.4.8: the restart count (Restarts)
+        phoneNetwork = AndroidPhoneNetwork(app),        // RFC-REACH-1: "Copy connection details"
     )
 
     init {

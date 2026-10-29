@@ -132,8 +132,14 @@ class ManageDeps(
     val homeHelper: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
     // 0.4.8: the restarts this phone counted for each TV (Restarts); the app gives Setup the same one.
     val restarts: Restarts = Restarts(documents),
+    // RFC-REACH-1: how the phone is connected, for "Copy connection details" (the app reads ConnectivityManager).
+    val phoneNetwork: PhoneNetwork = PhoneNetwork { PhoneNetworkFacts.UNKNOWN },
 ) {
     fun tv(id: TvId): Tv? = tvs.tvs.value.firstOrNull { it.id == id }
+
+    // RFC-REACH-1: the block "Copy connection details" copies or shares, made when asked for.
+    suspend fun connectionDetails(): String =
+        ConnectionDetails(about, tvs, sessions, discovery, access, phoneNetwork, diagnostics, clock, redact).build()
 
     // The TV's exact profile as Setup last stored it, unless it does not fit the Home of the TV's
     // latest snapshot (issue #114: a record kept from before the rule names an Android TV list for a

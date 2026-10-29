@@ -22,7 +22,10 @@ import tv.cleanyour.core.flows.AppSettingsState
 import tv.cleanyour.core.flows.ChipState
 import tv.cleanyour.core.flows.LeftoversState
 import tv.cleanyour.core.flows.ManageState
+import tv.cleanyour.core.flows.Reach
+import tv.cleanyour.core.flows.ReachCheck
 import tv.cleanyour.core.flows.ReportKind
+import tv.cleanyour.core.flows.Seen
 import tv.cleanyour.core.flows.ReportState
 import tv.cleanyour.core.flows.HomePath
 import tv.cleanyour.core.flows.RestartTally
@@ -58,6 +61,7 @@ private fun fakeShot(): ByteArray {
 }
 
 private const val NOW = Samples.NOW_MS
+private const val FINGERPRINT = "3A:91:0C:7E:55:12:9B:44:E0:21:6D:88:F3:0A:BC:42"
 private val tvId = Samples.miTvId()
 private val dockNames = listOf("Netflix", "YouTube", "Prime Video", "Live TV")
 private val shotPng by lazy { fakeShot() }
@@ -276,8 +280,23 @@ object ManageShots {
         Shot("report_unavailable") { ReportScreen(ReportState(ReportKind.TV, loading = false, available = false), {}, {}) },
 
         // M1a the debugging step for a returning write
-        Shot("debugstep_waiting") { SheetOver({ ManageScreen(manage(), {}) }) { DebugStepContent("Mi TV 4A", connecting = false) {} } },
-        Shot("debugstep_connecting") { SheetOver({ ManageScreen(manage(), {}) }) { DebugStepContent("Mi TV 4A", connecting = true) {} } },
+        Shot("debugstep_waiting") { SheetOver({ ManageScreen(manage(), {}) }) { DebugStepContent(Reach.NeedsDebugging(tvId, "Mi TV 4A"), ReachCheck(), {}) } },
+        Shot("debugstep_connecting") { SheetOver({ ManageScreen(manage(), {}) }) { DebugStepContent(Reach.Connecting(tvId, "Mi TV 4A"), ReachCheck(), {}) } },
+        // RFC-REACH-1: each case in its own words, the check under "Show details" and the hint after 30 s
+        Shot("debugstep_switched_off") { SheetOver({ ManageScreen(manage(), {}) }) { DebugStepContent(Reach.NeedsDebugging(tvId, "Mi TV 4A"), ReachCheck(switchedOff = true), {}) } },
+        Shot("debugstep_not_on_wifi") { SheetOver({ ManageScreen(manage(), {}) }) { DebugStepContent(Reach.WrongNetwork(tvId, "Mi TV 4A"), ReachCheck(onWifi = Seen.NO), {}) } },
+        Shot("debugstep_allow") { SheetOver({ ManageScreen(manage(), {}) }) { DebugStepContent(Reach.AwaitingAllow(tvId, "Mi TV 4A", FINGERPRINT), ReachCheck(asksToAllow = Seen.YES), {}) } },
+        Shot("debugstep_details", 1400.dp) { SheetOver({ ManageScreen(manage(), {}) }) {
+            DebugStepContent(Reach.NeedsDebugging(tvId, "Mi TV 4A"), ReachCheck(Seen.YES, Seen.NO, Seen.NO, Seen.CHECKING, Seen.NO, switchedOff = true, waitedMs = 8_000), {}, initiallyOpen = true)
+        } },
+        Shot("debugstep_stuck", 1500.dp) { SheetOver({ ManageScreen(manage(), {}) }) {
+            DebugStepContent(Reach.NeedsDebugging(tvId, "Mi TV 4A"), ReachCheck(Seen.YES, Seen.YES, Seen.NO, Seen.NO, Seen.NO, switchedOff = true, waitedMs = 34_000), {},
+                details = DetailsUi(copied = true), initiallyOpen = true)
+        } },
+        Shot("debugstep_collecting", 1400.dp) { SheetOver({ ManageScreen(manage(), {}) }) {
+            DebugStepContent(Reach.NeedsDebugging(tvId, "Mi TV 4A"), ReachCheck(Seen.YES, Seen.UNKNOWN, Seen.NO, Seen.NO, Seen.NO, waitedMs = 12_000), {},
+                details = DetailsUi(busy = true), initiallyOpen = true)
+        } },
 
         // The open-run card (R5-W8 O2)
         Shot("openwrite_connection_lost") { SheetOver({ ManageScreen(manage(), {}) }) { OpenWriteContent(openWrite(), {}, {}, {}) } },
@@ -328,6 +347,8 @@ object ManageShots {
         Shot("appsettings_key_tee", tall) { AppSettingsScreen(appSettings(backing = "TEE"), {}, {}, {}) },
         Shot("appsettings_key_wrapped", tall) { AppSettingsScreen(appSettings(backing = "WRAPPED_SOFTWARE"), {}, {}, {}) },
         Shot("appsettings_licences") { SheetOver({ AppSettingsScreen(appSettings(), {}, {}, {}) }) { LicencesContent() } },
+        Shot("appsettings_details") { SheetOver({ AppSettingsScreen(appSettings(), {}, {}, {}) }) { DetailsContent(DetailsUi(), {}) } },
+        Shot("appsettings_details_copied") { SheetOver({ AppSettingsScreen(appSettings(), {}, {}, {}) }) { DetailsContent(DetailsUi(copied = true), {}) } },
         Shot("appsettings_privacy") { SheetOver({ AppSettingsScreen(appSettings(), {}, {}, {}) }) { PrivacyContent() } },
         Shot("appsettings_reset_key") { SheetOver({ AppSettingsScreen(appSettings(), {}, {}, {}) }) { ConfirmContent(AppConfirm.RESET_KEY, working = false) {} } },
         Shot("appsettings_delete_all") { SheetOver({ AppSettingsScreen(appSettings(), {}, {}, {}) }) { ConfirmContent(AppConfirm.DELETE_EVERYTHING, working = false) {} } },
