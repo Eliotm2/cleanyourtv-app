@@ -441,6 +441,8 @@ object SetupShots {
         // Issue #275: a TCL Google TV, whose remote's gear, Netflix and YouTube buttons need Google TV's home.
         Shot("found_tcl_remote_keys") { Setup(found(), connected.copy(tvName = "TCL 55C755", tclRemoteKeys = true)) },
         // RFC-HELPER-1 (test build): the Home button helper chosen on a casting TV: the redirect's outcome, never "keeps its own".
+        // #251: a Google TV cleaned before, nothing left to switch off: Customise still offers the helper.
+        Shot("found_zero_kept_helper_offer") { Setup(found(zeroPlan.copy(summary = zeroPlan.summary.copy(homeScreenPossible = false))), connected.copy(tvName = "Google TV Streamer", brand = "Google", homePossible = false, homeBlock = HomeBlock.WIZARD_STAYS_ON, helperOffer = true)) },
         Shot("found_helper") { Setup(found(), connected.copy(tvName = "Google TV Streamer", brand = "Google", homePossible = false, homeBlock = HomeBlock.CASTING, helperOffer = true, helperOn = true)) },
 
         // S3a Customise: Simple with the other groups collapsed; Custom with every group open, the
