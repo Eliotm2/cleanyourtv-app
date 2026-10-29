@@ -1,0 +1,96 @@
+# Fork (Thomas): every push to `thomas` whose app version has no release yet gets one: tests, the APK
+# signed with the fork's key (checked), and a release named after the version, which the app's
+# "Check for updates" offers. Covers the versions made by hand; the nightly thomas-sync.yml publishes its
+# own (a push made with the workflow token starts no other workflow, so nothing is published twice).
+#
+# Secrets: KEYSTORE_B64 and KEYSTORE_PROPERTIES, as for thomas-sync.yml.
+name: Thomas · publier la version
+
+on:
+  push:
+    branches: [thomas]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: thomas-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: thomas
+          fetch-depth: 1
+          submodules: true
+
+      - name: Version, and whether it is already published
+        id: v
+        run: |
+          version=$(sed -n 's/^ *versionName = "\([0-9][0-9A-Za-z.-]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          [ -n "$version" ] || { echo "::error::no versionName in app/build.gradle.kts"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "$version" >/dev/null 2>&1; then echo "new=false" >> "$GITHUB_OUTPUT"; echo "$version is already published"
+          else echo "new=true" >> "$GITHUB_OUTPUT"; echo "$version gets a release"; fi
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        if: steps.v.outputs.new == 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Signing key
+        if: steps.v.outputs.new == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
+        run: |
+          [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PROPERTIES" ] || { echo "::error::secrets KEYSTORE_B64 and KEYSTORE_PROPERTIES are missing"; exit 1; }
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/thomas.jks"
+          { printf '%s\n' "$KEYSTORE_PROPERTIES" | grep -v '^storeFile='; echo "storeFile=$RUNNER_TEMP/thomas.jks"; } > keystore.properties
+
+      - name: Tests and signed APK
+        if: steps.v.outputs.new == 'true'
+        run: ./gradlew --no-daemon --continue test :app:assembleFullRelease
+
+      - name: The APK carries the fork's key and this version
+        if: steps.v.outputs.new == 'true'
+        id: apk
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          apk=$(ls app/build/outputs/apk/full/release/*.apk | head -1)
+          bt="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          signer=$("$bt/apksigner" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)
+          [ "$signer" = fa73a3a033c6bb075706307ff446928530b90305a198b4349b02c4ce1eae29d5 ] || { echo "::error::APK signed by $signer"; exit 1; }
+          "$bt/aapt2" dump badging "$apk" | head -1 | grep -q "versionName='$VERSION'" || { echo "::error::APK is not $VERSION"; exit 1; }
+          cp "$apk" "$RUNNER_TEMP/cleanyourtv-thomas-$VERSION.apk"
+          echo "path=$RUNNER_TEMP/cleanyourtv-thomas-$VERSION.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
+        if: steps.v.outputs.new == 'true'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          APK: ${{ steps.apk.outputs.path }}
+        run: |
+          rm -f keystore.properties
+          gh release create "$VERSION" "$APK" --target "$GITHUB_SHA" --title "$VERSION" \
+            --notes "Version du fork de Thomas ($(git log -1 --format=%s | cut -c1-200)). Signée avec la clé du fork : elle s'installe par-dessus la version précédente."
+
+      - name: Say why it stopped
+        if: failure()
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Publication de ${VERSION:-la version} : à regarder"
+          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          [ -n "$existing" ] || gh issue create --title "$title" --body "La compilation, les tests ou la publication ont échoué ; rien n'a été publié. Détail : $RUN"

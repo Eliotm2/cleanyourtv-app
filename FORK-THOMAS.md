@@ -67,6 +67,13 @@ Secrets du dépôt (Settings › Secrets and variables › Actions) : `KEYSTORE_
 reprise nocturne : l'appli embarque le launcher que la release amont épingle, et c'est l'étape 2 qui signale un
 changement.
 
+## Publication à chaque version poussée
+
+`.github/workflows/thomas-release.yml` : à chaque push sur `thomas` dont la version (`versionName`) n'a pas encore de
+release, GitHub lance les tests, compile l'APK signé (clé et version vérifiées) et publie la release `<version>`. Les
+versions faites à la main sont ainsi proposées par « Check for updates », comme celles de la reprise de nuit (qui
+publie elle-même ; ses pushes, faits avec le jeton du workflow, ne relancent pas celui-ci).
+
 ## Compiler
 
 JDK 21, Gradle 9.7.1 (wrapper), `./gradlew :app:assembleFullRelease`. `keystore.properties` à la racine (jamais
