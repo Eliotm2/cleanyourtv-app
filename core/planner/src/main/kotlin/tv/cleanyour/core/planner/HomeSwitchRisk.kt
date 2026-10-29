@@ -58,8 +58,11 @@ object HomeSwitchRisk {
     val CASTING_PROFILES: Set<String> = setOf("google-chromecast-gtv-4k", "google-chromecast-gtv-hd", "google-tv-streamer-4k-kirkwood")
 
     // Sets of the MOKA family from TV reports, with no list of their own. The ACER R4G (issues #74
-    // and #102): device R4_GTV, manufacturer MOKA, the same family as R3_GTV and R10G.
-    val MOKA_REPORTED: Set<Pair<String, String>> = setOf("R4_GTV" to "MOKA")
+    // and #102): device R4_GTV, manufacturer MOKA, the same family as R3_GTV and R10G. 0.4.7-beta2: the
+    // R3 and R4 boards sold under Panasonic and other brands report the maker SCBC and carry the same
+    // firmware (com.moka.tv.overlay.framework, MOKA's com.mk services, Realtek); 18 reports, none with
+    // the switch yet, so they get no switch until one holds on a tested list.
+    val MOKA_REPORTED: Set<Pair<String, String>> = setOf("R4_GTV" to "MOKA", "R3" to "SCBC", "R4" to "SCBC")
 
     // The MOKA family by the exact device and maker pairs its three profiles match on (kalley-43g200:
     // R3_GTV by MOKA; prismplus-q65-ultra-r10g: R10G by MOKA; kalley-r10g: R10G under the Kalley

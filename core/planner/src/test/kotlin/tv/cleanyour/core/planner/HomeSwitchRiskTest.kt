@@ -123,7 +123,7 @@ class HomeSwitchRiskTest {
     @Test fun theMokaFamilyGetsNoSwitch() {
         val pairs = HomeSwitchRisk.MOKA_PROFILES.flatMap { id -> shipped.getValue(id).match.let { m -> m.devices.map { it to m.brand!! } } }.toSet()
         // The family is what its profiles match on plus the reported sets no profile matches.
-        val reported = setOf("R4_GTV" to "MOKA")
+        val reported = setOf("R4_GTV" to "MOKA", "R3" to "SCBC", "R4" to "SCBC")
         assertEquals(reported, HomeSwitchRisk.MOKA_REPORTED)
         assertEquals(HomeSwitchRisk.MOKA_FAMILY, pairs + reported, "the family is its profiles' pairs plus the reported sets")
         assertTrue(reported.none { it in pairs }, "a reported set with a profile belongs with the profiles")
@@ -164,6 +164,17 @@ class HomeSwitchRiskTest {
         assertEquals(listOf(Risk.BOOT_LOOP.reason), refused(setup(profile = null), snapshot = withFacts(r4g)))
         // Not the device name under another maker.
         assertNull(HomeSwitchRisk.of(facts("R4_GTV", "Acme"), null, noWizard, WizardWifi.NOT_OWNER))
+    }
+
+    // 0.4.7-beta2: the same board under Panasonic and other brands reports the maker SCBC (devices R3
+    // and R4) and gets no switch either, in the test build's R0 for every brand too.
+    @Test fun theScbcBoardsGetNoSwitch() {
+        for (device in listOf("R3", "R4")) {
+            val set = tv.facts.copy(brand = "Panasonic", manufacturer = "SCBC", model = "2KTV-2TH", device = device, sdk = 34)
+            assertTrue(HomeSwitchRisk.isMokaFamily(set), device)
+            assertEquals(Risk.BOOT_LOOP, HomeSwitchRisk.of(set, null, withFacts(set), WizardWifi.NOT_OWNER, anyBrand = true), device)
+        }
+        assertNull(HomeSwitchRisk.of(facts("R4", "Acme"), null, noWizard, WizardWifi.NOT_OWNER))
     }
 
     // The reference TV keeps its switch.
