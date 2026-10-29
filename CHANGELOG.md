@@ -41,6 +41,16 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
 - Skyworth SWTV-22AE-FHD: the list keeps Skyworth's daily manager, quick menu and My Apps on, which
   the remote's custom (Daily) button needs (#1378). The Skyworth remote's hot key service and quick
   menu are never switched off on any TV.
+- A TV whose Home answers to a home screen we don't know, ranked above ours (an operator's launcher
+  such as Jio's on the JMSB200A), keeps its own home screen: Android would not let ours take Home
+  there (#2028). And when an undo finds Home back where it was before the run, it finishes instead
+  of pausing on "undo step failed".
+- The MOKA board sold under Panasonic and other brands (maker SCBC, devices R3 and R4) gets no home
+  screen switch, like the rest of that family.
+
+### Reports
+- Reports and "Copy error" show the app's version again. A four-part version such as 0.4.6.1 looked
+  like a network address, so it was masked as "App: [address]".
 
 ### Smaller fixes
 - After the Home button helper is switched off, the Home screen page no longer offers "Use the TV's
