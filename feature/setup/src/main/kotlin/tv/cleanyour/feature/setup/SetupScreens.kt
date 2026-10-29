@@ -230,7 +230,8 @@ fun FoundScreen(
     // Every switch-off of the plan, the home screen switch's own included (round 3).
     val off = summary.switchOffCount
     val kept = extras.homeKept as? HomeKept.Blocked ?: if (!summary.homeScreenPossible && extras.homePossible) HomeKept.Blocked(HomeBlock.NONE, extras.fireTv, extras.brand) else null
-    val nothingToDo = kept != null && off == 0
+    // 0.4.7-beta2 (issue #251): with the Home button helper switched on there is something to do.
+    val nothingToDo = kept != null && off == 0 && !extras.helperOn
     var why by rememberSaveable { mutableStateOf(false) }
     val locale = LocalConfiguration.current.locales[0]
     ScreenScaffold(
@@ -247,11 +248,17 @@ fun FoundScreen(
             ActionColumn {
                 when {
                     // An empty plan on a kept TV runs nothing: no credential prompt, no "Nothing was changed".
+                    // RFC-HELPER-1 (test build): an empty plan still opens Customise where the Home button
+                    // helper is offered, or a TV cleaned before (Run Setup again) could never reach it (#251).
                     nothingToDo && extras.unknownModel -> {
                         PrimaryButton(stringResource(R.string.found_help_add_tv), onHelpAddTv, guardObscured = false)
                         SecondaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) })
+                        if (extras.helperOffer) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
                     }
-                    nothingToDo -> PrimaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, guardObscured = false)
+                    nothingToDo -> {
+                        PrimaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, guardObscured = false)
+                        if (extras.helperOffer) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
+                    }
                     else -> {
                         // Nothing to switch off and the switch is possible: the button says what it does.
                         PrimaryButton(stringResource(if (off == 0) R.string.found_switch_home else R.string.found_make_clean), { actions.intent(SetupIntent.MakeItClean) }, loading = extras.starting)
