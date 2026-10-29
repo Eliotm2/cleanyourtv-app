@@ -204,7 +204,12 @@ class TvAccess(
                 var handshake: AdbError? = null
                 if (open != null) {
                     mutableReach.value = Reach.Connecting(tvId, tv.nickname)
-                    val r = sessions.open(open, tvId) { fp ->
+                    // RFC-REACH-1: on a network other than the setup's, the saved address may be someone else's TV now
+                    // (an office or a friend's Wi-Fi), so only the known-TV handshake: no Allow dialog on a stranger's
+                    // TV, and a refusal there is no reason to stop looking.
+                    val elsewhere = same == Seen.NO
+                    val r = if (elsewhere) attempt { sessions.openKnown(open, tvId) }.getOrElse { OpenResult.Failed(AdbError.Transport.Unreachable) }
+                    else sessions.open(open, tvId) { fp ->
                         mutableReach.value = Reach.AwaitingAllow(tvId, tv.nickname, fp)
                         mutableCheck.update { it.copy(asksToAllow = Seen.YES) }
                         logState(net, same, hosts.size, true, null)
@@ -220,7 +225,7 @@ class TvAccess(
                             handshake = r.error
                             handshakes[tvId] = LogCodes.of(r.error)
                             when (r.error) {
-                                is AdbError.Policy.WrongTv, AdbError.Transport.NoShellV2, AdbError.Auth.Denied -> {
+                                is AdbError.Policy.WrongTv, AdbError.Transport.NoShellV2, AdbError.Auth.Denied -> if (!elsewhere) {
                                     logState(net, same, hosts.size, true, r.error, final = true)
                                     return AccessResult.Failed(r.error)
                                 }

@@ -104,7 +104,6 @@ class ReachTest {
         val h = Harness()
         val tv = Samples.tv()
         h.tvs.upsert(tv)
-        otherNetwork(h)
         val otherId = TvId("0123456789abcdef")
         h.sessions.register(HOST, FakeTvSession(identity = Fixtures.miTv().identity().copy(tvId = otherId)))
         h.discovery.open5555[HOST] = true
@@ -112,8 +111,41 @@ class ReachTest {
         assertIs<AccessResult.Failed>(result)
         assertIs<AdbError.Policy.WrongTv>(result.error)
         assertNull(h.sessions.existing(otherId), "the other TV got no session")
-        assertEquals(tv, h.tvs.tvs.value.single(), "nothing saved, the old network kept")
+        assertEquals(tv, h.tvs.tvs.value.single(), "nothing saved")
         assertEquals("wrong_tv", h.access.lastHandshake(tv.id))
+    }
+
+    // On a network other than the setup's the saved address may be a stranger's TV: only the known-TV handshake,
+    // so no Allow dialog shows there, and a different TV at that address does not end the wait.
+    @Test fun onAnotherNetworkTheSavedAddressGetsOnlyTheKnownHandshakeAndTheWaitGoesOn() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        val tv = Samples.tv()
+        h.tvs.upsert(tv)
+        otherNetwork(h)
+        val otherId = TvId("0123456789abcdef")
+        h.sessions.register(HOST, FakeTvSession(identity = Fixtures.miTv().identity().copy(tvId = otherId)))
+        h.discovery.open5555[HOST] = true
+        val job = backgroundScope.launch { h.access.session(tv.id) }
+        settle(4_100)
+        assertFalse(job.isCompleted, "a different TV at the old address is no reason to stop looking")
+        assertIs<Reach.NeedsDebugging>(h.access.reach.value)
+        assertTrue(h.sessions.opens.isEmpty(), "never the open that can show the Allow dialog on another network")
+        assertTrue(Endpoint.PlainTcp(HOST) in h.sessions.knownOpens)
+        assertNull(h.sessions.existing(otherId), "the other TV got no session")
+        assertEquals(tv, h.tvs.tvs.value.single(), "nothing saved")
+    }
+
+    @Test fun onAnotherNetworkATvThatNeedsAllowShowsNoDialog() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        val tv = Samples.tv()
+        h.tvs.upsert(tv)
+        otherNetwork(h)
+        h.sessions.allowPromptFor[HOST] = "ab:cd"
+        h.discovery.open5555[HOST] = true
+        backgroundScope.launch { h.access.session(tv.id) }
+        settle(2_100)
+        assertTrue(h.sessions.opens.isEmpty())
+        assertFalse(h.access.reach.value is Reach.AwaitingAllow, "no Allow prompt is raised on another network")
     }
 
     @Test fun quietReconnectsAcrossASubnetChange() = runTest(timeout = 30.seconds) {
