@@ -884,7 +884,8 @@ class SetupMachine(
             is ProfileResolution.None -> r.stockLaunchers
             null -> emptyList()
         }
-        val stockUnknown = !ours && StockHome.of(snap, stocks) == null
+        // Issue #2028: so is a TV whose Home answers to a home screen we do not know, ranked above ours.
+        val stockUnknown = !ours && (StockHome.of(snap, stocks) == null || StockHome.unknownAboveOurs(snap, stocks))
         return when {
             f.installRefusal || fireOs || p?.platform == Platform.TCL_CN || TclChina.applies(f, p) -> HomeBlock.TV_REFUSES
             f.sdk < DefaultPlanner.TV_MIN_SDK -> HomeBlock.OLD_ANDROID

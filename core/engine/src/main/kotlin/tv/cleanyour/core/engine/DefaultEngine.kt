@@ -479,20 +479,37 @@ class DefaultEngine(
     // done and verified. Once VerifyHome passes, the TV's own home screen is back, so a refusal before
     // it (Fire OS refuses pm enable of its protected launcher) is a skip, its Failed record kept; the
     // run pauses only when the TV's own home screen is really not back.
+    //
+    // Issue #2028 (a Jio set-top box): Home answered to the operator's own launcher, which Android ranks
+    // above every other claimant, so the switch never took Home, and step R's SetHome and VerifyHome of
+    // the stock home (tvlauncher, switched off and on again) failed on every Carry on while the TV was as
+    // it was. Home as it was before the switch (homeBefore) is the TV's own home screen back too, so step
+    // R's SetHome and VerifyHome hold on it; an Enable that failed then still pauses the run, as nothing
+    // shows that package on again. A SetHome of the section that never took effect (not done: its check
+    // failed, or it never ran) changed no Home, so the failure of the SetHome that undoes it is no reason
+    // to pause on its own; VerifyHome still decides. Home on anything else still pauses the run.
     private suspend fun rollbackSection(run: Run, section: GuardedSection, outcome: HomeOutcome): Boolean {
         flow(run.plan.tvId).value = RunState.RollingBack(run.plan, section.from)
         journal.append(JournalRecord.Rollback(run.plan.id, section.from))
+        val before = homeBefore(run, section)
+        val setHome = run.plan.steps.firstOrNull { it.index in section.from..section.to && it.op is Op.SetHome }
+        val setHomeNoEffect = setHome != null && setHome.index !in run.done
         var failed: AdbError? = null   // the first failure since the last VerifyHome that passed
+        var enableFailed: AdbError? = null   // the first Enable that failed, which Home as before does not clear
         for (op in section.rollback) {
             if (!StepR.allows(op, section)) continue
             val undone = run.plan.steps.firstOrNull { it.index in section.from..section.to && undoes(op, it.op) }?.index ?: -1
             val rendered = try { renderer.render(op) } catch (e: RenderRefused) { continue }
-            when (val r = performStepR(run, undone, op, rendered)) {
-                is Outcome.Lost -> { pause(run, PauseReason.CONNECTION_LOST, r.error); return false }
-                is Outcome.Refused -> if (StepR.mustSucceed(op) && failed == null) failed = AdbError.NonZeroExit(r.exit, r.stderr.take(4096))
-                is Outcome.Failed -> if (StepR.mustSucceed(op) && failed == null) failed = r.error
-                Outcome.Ok -> if (op is Op.VerifyHome) failed = null
+            val counts = StepR.mustSucceed(op) && !(op is Op.SetHome && setHomeNoEffect)
+            val r = performStepR(run, undone, op, rendered, before)
+            val error = when (val o = r.outcome) {
+                is Outcome.Lost -> { pause(run, PauseReason.CONNECTION_LOST, o.error); return false }
+                is Outcome.Refused -> AdbError.NonZeroExit(o.exit, o.stderr.take(4096))
+                is Outcome.Failed -> o.error
+                Outcome.Ok -> { if (op is Op.VerifyHome) failed = if (r.asBefore) enableFailed else null; null }
             }
+            if (error != null && counts && failed == null) failed = error
+            if (error != null && op is Op.Enable && enableFailed == null) enableFailed = error
         }
         if (failed != null) { pause(run, PauseReason.STEP_FAILED, failed); return false }
         journal.append(JournalRecord.Section(run.plan.id, section.name, section.token, SectionState.ROLLED_BACK, clock.nowMs()))
@@ -506,7 +523,9 @@ class DefaultEngine(
     // target is read (targetHolds: a read that proves the state, never an empty or failed one); if it
     // holds (the package enabled, HOME on the stock launcher, no watchdog left), Done
     // (verified) is journaled instead of Failed, so the change records see the item as put back.
-    private suspend fun performStepR(run: Run, index: Int, op: Op, rendered: Rendered): Outcome {
+    // Issue #2028: a SetHome or VerifyHome also holds when HOME answers to `before`, the home screen
+    // before the switch (asBefore).
+    private suspend fun performStepR(run: Run, index: Int, op: Op, rendered: Rendered, before: Component? = null): StepROutcome {
         journal.append(JournalRecord.Begin(run.plan.id, index, op, rendered.lines.map { it.text }, null, clock.nowMs()))
         val started = clock.monotonicMs()
         val outcome = try {
@@ -514,12 +533,14 @@ class DefaultEngine(
         } catch (e: AdbException) {
             if (e.error.isLost()) Outcome.Lost(e.error) else Outcome.Failed(e.error, e.error.toString())
         }
+        var asBefore = false
         val held = when {
             outcome == Outcome.Ok || outcome is Outcome.Lost -> false
             else -> try {
-                targetHolds(run.session, op, rendered)
+                targetHolds(run.session, op, rendered) ||
+                    ((op is Op.SetHome || op is Op.VerifyHome) && before != null && homeAnswers(run.session, before)).also { asBefore = it }
             } catch (e: AdbException) {
-                if (e.error.isLost()) return Outcome.Lost(e.error)   // in doubt: no Done, no Failed; resume runs step R again
+                if (e.error.isLost()) return StepROutcome(Outcome.Lost(e.error))   // in doubt: no Done, no Failed; resume runs step R again
                 false
             }
         }
@@ -531,7 +552,23 @@ class DefaultEngine(
             outcome is Outcome.Failed -> journal.append(JournalRecord.Failed(run.plan.id, index, null, outcome.detail.take(4096), ""))
             else -> {}
         }
-        return if (held) Outcome.Ok else outcome
+        return StepROutcome(if (held) Outcome.Ok else outcome, asBefore)
+    }
+
+    private class StepROutcome(val outcome: Outcome, val asBefore: Boolean = false)
+
+    // Issue #2028: the home screen HOME answered to before the switch, as the plan recorded it: the prior
+    // of the section's SetHome (StockHome.recorded, so never a placeholder), unless it is the new home screen.
+    private fun homeBefore(run: Run, section: GuardedSection): Component? =
+        run.plan.steps.firstOrNull { it.index in section.from..section.to && it.op is Op.SetHome }?.prior?.home
+            ?.takeUnless { StockHome.isPlaceholder(it) || it == section.expectedHome }
+
+    // Whether the HOME resolver names `home`, by VerifyHome's own read and check.
+    private suspend fun homeAnswers(session: TvSession, home: Component): Boolean {
+        val check = Op.VerifyHome(home)
+        val read = try { renderer.render(check) } catch (e: RenderRefused) { return false }
+        val r = readResult(session, read) ?: return false
+        return r.exit == 0 && r.stdout.isNotBlank() && renderer.check(check, r.stdout, null) == VerifyResult.Ok
     }
 
     // Whether an op's target state already holds on the TV, from a read that proves it: the read must
