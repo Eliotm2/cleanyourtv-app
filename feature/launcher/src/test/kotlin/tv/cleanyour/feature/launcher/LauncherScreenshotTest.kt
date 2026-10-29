@@ -82,6 +82,18 @@ private val themes = listOf(
     ThemeOption("six-columns", "Six columns", "Six apps across, so more fit on the screen."),
 )
 
+// A 16:9 PNG of a TV home screen: a dark wall and four tiles, for "This is your TV now".
+private fun tvShot(): ByteArray {
+    val bmp = android.graphics.Bitmap.createBitmap(640, 360, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bmp)
+    canvas.drawColor(0xFF0B1E3A.toInt())
+    val paint = android.graphics.Paint().apply { color = 0xFF3A6FB0.toInt() }
+    repeat(4) { i -> canvas.drawRoundRect(android.graphics.RectF(70f + i * 130f, 220f, 180f + i * 130f, 320f), 16f, 16f, paint) }
+    val out = java.io.ByteArrayOutputStream()
+    bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+    return out.toByteArray()
+}
+
 private fun home(
     themeId: String? = null, drift: Boolean = false, busy: Busy? = null, stock: Boolean = true, ours: Boolean = true, dock: List<AppChoice> = defaultDock,
     updateTo: String? = null, endedLook: String? = null,
@@ -154,6 +166,10 @@ object LauncherShots {
         Shot("home_busy_working") { HomeScreen(home(busy = Busy.Working(40, listOf("Updating the home screen on the TV..."))), {}, {}) },
         Shot("home_no_stock_launcher") { HomeScreen(home(stock = false), {}, {}) },
         Shot("home_stock_already_in_use") { HomeScreen(home(ours = false), {}, {}) },
+        // 0.4.8 (beta1 QA): the helper switched off, the TV's own home screen is Home: no "Use the TV's own home screen".
+        Shot("home_stock_is_home") { HomeScreen(home().copy(stockIsHome = true, helper = tv.cleanyour.core.flows.HelperCard(tv.cleanyour.core.flows.HelperShown.REDIRECT_ONLY, googleTv = false)), {}, {}) },
+        // 0.4.8 (PLAN item 3): "This is your TV now" after a look went to the TV.
+        Shot("home_tv_now", 1100.dp) { HomeScreen(home().copy(lookShot = remember { tvShot() }), {}, {}) },
         Shot("home_empty_dock") { HomeScreen(home(dock = emptyList()), {}, {}) },
         Shot("home_dock_rows") { HomeScreen(home(dock = rowsDock), {}, {}) },
         Shot("home_update_available") { HomeScreen(home(updateTo = "2.4"), {}, {}) },
@@ -191,6 +207,8 @@ object LauncherShots {
         Shot("look_failed_kept") { HomeScreen(lookSheet(LookFixtures.draft(changed = true)) { it.copy(lookFailed = true, look = it.look) }, {}, {}) },
         // look2 Look sheet: the three pages, the states of spec W2 to W12.
         Shot("look_main", 1100.dp) { LookShot(lookSheet(LookFixtures.draft())) },
+        // 0.4.8 (beta1 QA): opened with nothing changed, the TV has it: no "Put it on the TV".
+        Shot("look_main_nothing_changed", 1100.dp) { LookShot(lookSheet(LookFixtures.draft(canSend = false))) },
         Shot("look_main_changed", 1100.dp) {
             LookShot(lookSheet(LookFixtures.draft(StyleId.GLASS, columns = 7, wayBack = WayBack.UNDO, changed = true, tvChanged = true)))
         },

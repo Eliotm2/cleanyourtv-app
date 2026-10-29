@@ -2,6 +2,42 @@
 
 All notable changes to the app. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.4.8 (unreleased)
+
+### Restarts the app counts
+- On a TV whose home screen the app switched, or whose Home button helper it switched on, each
+  connect reads the TV's boot id beside the Home check Manage already does. A restart with the new
+  home screen still answering Home counts as held; the TV's own back after a restart counts as
+  failed. The count is kept on the phone for each TV, with the first and last date and the app
+  that counted. Nothing new is sent to the TV, and nothing is changed on it.
+- Done's restart check says what it read: "The new home screen held through the restart." or "The
+  TV's own home screen came back after the restart.", where it said the new one is on before.
+
+### Tell us it worked
+- After a restart that held, Done and Manage offer "Tell us it worked". It opens a preview of a short
+  fixed block (the app and its build, the TV's model and Android version, the home path, restarts
+  held and failed, the look's route) and then GitHub's new confirmation form with it filled in.
+  The block has no names, addresses, serial numbers or keys, and nothing is sent until you post it.
+  Manage remembers when you told us.
+- A restart that failed offers "Report a problem" instead, and every problem report of a TV the app
+  switched has the same Restarts lines.
+
+### Your TV now
+- After a look goes to the TV, from Setup or from the Home screen page, the app shows the TV's
+  screenshot under "This is your TV now", with "Not right? Send it again".
+
+### Manage reconnects by itself
+- Manage keeps the TV's connection while it is on screen, so it no longer shows "Offline" after a
+  minute on another page. When the TV restarts or the app comes back, Manage reconnects by itself
+  with the key the TV already allowed: no Allow prompt and no debugging step. Reconnect stays for
+  when that does not work.
+
+### Smaller fixes
+- After the Home button helper is switched off, the Home screen page no longer offers "Use the TV's
+  own home screen" when it is Home already.
+- The Look sheet no longer offers "Put it on the TV" when nothing changed; it says the TV has this
+  look.
+
 ## 0.4.7 (unreleased)
 
 ### When the TV keeps its own home screen

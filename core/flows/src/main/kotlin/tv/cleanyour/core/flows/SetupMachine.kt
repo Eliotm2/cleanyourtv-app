@@ -196,6 +196,11 @@ data class SetupExtras(
     // hold, the TV's own home screen is Google's), and the plan on screen uses it instead of the switch.
     val helperOffer: Boolean = false,
     val helperOn: Boolean = false,
+    // 0.4.8 (Restarts): what this phone counted for the TV, and what the Done restart check's read said (HELD, FAILED,
+    // or null before it); and (PLAN item 3) the TV's screenshot after Setup sent the look, "This is your TV now".
+    val restarts: RestartTally? = null,
+    val restartRead: RestartRead? = null,
+    val doneShot: ByteArray? = null,
 ) {
     // 0.4.7: the one state every screen reads when the TV keeps its own home screen (HomeKept).
     val homeKept: HomeKept? get() = HomeKept.of(this)
@@ -262,6 +267,8 @@ class SetupDeps(
     val sentReports: SentReports? = null,
     // RFC-HELPER-1: whether this build offers the Home button helper (the test build's bundled switch).
     val homeHelper: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
+    // 0.4.8: where the restarts are counted (Restarts); the app gives Manage the same one. Null counts none.
+    val restarts: Restarts? = documents?.let { Restarts(it) },
 )
 
 // The first-run wizard, screens S1 to S5 (PRODUCT-SPEC 4, UX 2 and 4). One machine per wizard run,
@@ -554,6 +561,12 @@ class SetupMachine(
             SetupIntent.CarryOn -> scope.launch { carryOn() }
             SetupIntent.UndoWhatWeDid -> scope.launch { undoWhatWeDid() }
             SetupIntent.Restart -> if (after is SetupState.Done && restartJob?.isActive != true) restartJob = scope.launch { restart(after) }
+            SetupIntent.TellUsItWorked -> if (after is SetupState.Done && (mutableExtras.value.restarts?.held ?: 0) > 0) effect(SetupEffect.Navigate("report/confirm/${after.tvId.value}"))
+            is SetupIntent.ReportRestartFailed -> if (after is SetupState.Done && mutableExtras.value.restartRead == RestartRead.FAILED) {
+                val ctx = ReportContext("Setup", ReportContext.named(event.title, tv?.nickname, knownTv?.nickname), ItWorked.RESTART_FAILED)
+                effect(SetupEffect.Navigate(IssueRoute.of(after.tvId, ctx)))
+            }
+            SetupIntent.SendLookAgain -> if (after is SetupState.Done && mutableExtras.value.doneShot != null) effect(SetupEffect.Navigate("home/${after.tvId.value}/again"))
             SetupIntent.SaveRestoreNote -> scope.launch { restoreNote() }
             SetupIntent.AddCard -> if (deps.store.addOns) tvIdOf(after)?.let { effect(SetupEffect.Navigate("modules/${it.value}")) }
             SetupIntent.Finish -> if (after is SetupState.Done && mutableExtras.value.finishing == null) scope.launch { finish(after.tvId) }
@@ -1349,6 +1362,35 @@ class SetupMachine(
             keepsDebugging = keepsDebugging(tvId), doneHomeKept = homeKept, doneLookFailed = lookFailed) }
         send(Ev.ShowDone(tvId, DoneSummary(off, homeOn, restorePointAt, skippedNames, recommended, restorePointEarlier)))
         session?.let { s -> mutableExtras.update { it.copy(restorePointPushed = deps.restorePoint.write(done, s, p)) } }
+        session?.let { s ->
+            // 0.4.8 (Restarts): the boot this Done starts from, so the restart check below (or Manage's next connect after
+            // a restart) has something to count against.
+            if (homeOn) countRestart(done, s)
+            // PLAN item 3: the look went to the TV with the new home screen: the TV as it looks now, one screenshot.
+            if (homeOn && !lookFailed && setupHome?.digest?.let { it == digest } == true) {
+                attempt { deps.prober.screenshot(s) }.getOrNull()?.let { png -> mutableExtras.update { it.copy(doneShot = png) } }
+            }
+        }
+    }
+
+    // 0.4.8 (Restarts): the TV's Home and its boot_id, on a TV this app switched (or gave the helper); the read counts a
+    // held or a failed restart against the one before it. Nothing else is read, nothing is written to the TV.
+    private suspend fun countRestart(record: Tv, s: TvSession): RestartRead? {
+        val restarts = deps.restarts ?: return null
+        val latest = attempt { deps.snapshots.latest(record.id) }.getOrNull()
+        val decision = attempt { deps.homeDecisions?.load(record.id) }.getOrNull()
+        val path = HomePath.of(record, latest, decision) ?: return null
+        val home = attempt { deps.prober.homeNow(s) }.getOrNull()?.takeIf { Restarts.settled(it) } ?: return null
+        val boot = attempt { deps.prober.bootId(s) }.getOrNull() ?: return null
+        val build = deps.about?.countLine ?: "unknown"
+        val o = attempt { restarts.observe(record.id, boot, home, path, build, deps.clock.nowMs()) }.getOrNull() ?: return null
+        when (o.read) {
+            RestartRead.HELD -> deps.log.line("setup: restart held (${path.word}), ${o.tally.held} held, ${o.tally.failed} failed")
+            RestartRead.FAILED -> deps.log.line("setup: restart failed (${path.word}): Home does not answer to the new home screen, ${o.tally.held} held, ${o.tally.failed} failed")
+            else -> {}
+        }
+        mutableExtras.update { it.copy(restarts = o.tally) }
+        return o.read
     }
 
     private suspend fun stopAndUndo() {
@@ -1628,9 +1670,12 @@ class SetupMachine(
 
     // After the restart: things that came back on are switched off again (UX 4.8).
     private suspend fun backAfterRestart(record: Tv, s: TvSession, afterMs: Long) {
-        mutableExtras.update { it.copy(card = null) }
+        mutableExtras.update { it.copy(card = null, restartRead = null) }
+        // 0.4.8 (Restarts): Home is read before the leftovers are switched off again, so the count says what the
+        // restart did by itself; only a new boot counts, so a read with the same boot says nothing on Done.
+        val read = if ((state.value as? SetupState.Done)?.summary?.homeScreenOn == true) countRestart(tv ?: record, s) else null
         val came = attempt { switchOffLeftovers(record, s) }.getOrDefault(0)
-        mutableExtras.update { it.copy(restartReenabled = came) }
+        mutableExtras.update { it.copy(restartReenabled = came, restartRead = read?.takeIf { it == RestartRead.HELD || it == RestartRead.FAILED }) }
         send(Ev.RestartUpdate(RestartState.Back(afterMs)))
     }
 

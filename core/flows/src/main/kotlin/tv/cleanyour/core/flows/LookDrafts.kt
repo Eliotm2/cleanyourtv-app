@@ -358,6 +358,7 @@ internal class LookDrafts(
             extras = if (LookGates.reads30(tv.versionCode)) p.extras else LookExtras.DEFAULT,
             actingExtras = LookRules.extras(p, rows, tv),
             offeredExtras = LookRules.extras(p.copy(extras = ALL_ON), rows, tv),
+            unsent = ctx.sent == null,
         )
     }
 

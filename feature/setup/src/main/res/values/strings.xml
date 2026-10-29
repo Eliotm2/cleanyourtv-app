@@ -393,6 +393,16 @@
     <string name="restart_progress_home_helper">The Home button opens the new home screen.</string>
     <string name="restart_progress_home_own">Home screen is the TV\'s own, as before.</string>
     <string name="restart_progress_good">All good.</string>
+    <!-- 0.4.8: what the app counted across the restart (Restarts), and the one tap that tells us (the confirmation) -->
+    <string name="restart_progress_held">The new home screen held through the restart.</string>
+    <string name="restart_progress_failed">The TV\'s own home screen came back after the restart.</string>
+    <string name="done_tell_us">Tell us it worked</string>
+    <string name="done_tell_us_note">It counts for this TV model. You see what goes first, and nothing is sent until you post it on GitHub.</string>
+    <string name="done_restart_report_note">Tell us, so we can look at this TV model. The report says what the app counted.</string>
+    <!-- 0.4.8: "This is your TV now", the TV's screenshot after Setup sent the look -->
+    <string name="done_tv_now_title">This is your TV now</string>
+    <string name="done_tv_now_cd">What the TV shows now</string>
+    <string name="done_tv_now_again">Not right? Send it again</string>
     <string name="restart_came_back">{count, plural, one {# thing came back on after the restart; switched off again.} other {# things came back on after the restart; switched off again.}}</string>
     <string name="restart_slow">Taking longer than usual. Some TVs are slow to rejoin Wi-Fi. If the TV shows its logo and nothing else, wait another two minutes.</string>
 

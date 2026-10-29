@@ -180,7 +180,14 @@ data class LookDraft(
     // row whose key cannot act in this look is hidden or greyed, never a live toggle that does nothing.
     val actingExtras: LookExtras = LookExtras.DEFAULT,
     val offeredExtras: LookExtras = LookExtras.DEFAULT,
-)
+    // 0.4.8 (beta1 QA): nothing was sent from this phone yet, so the phone cannot say the TV has this draft.
+    val unsent: Boolean = false,
+) {
+    // 0.4.8 (beta1 QA): "Put it on the TV" only when it would change something: the draft differs from what was sent,
+    // it carries a photo the TV does not have, the TV's own settings changed the look, nothing was sent yet, or what was
+    // sent is a 0.4.0 look (the send moves it to the new form, other bytes).
+    val canSend: Boolean get() = changed || newPhoto || tvChanged || unsent || legacyThemeId != null
+}
 
 // 0.4.7: what Customise names the look step's choice by. Before, the row read only the 0.4.0 theme id, so a look
 // with the person's own photo said "Look: Default". Legacy: a 0.4.0 look by its theme id, the wizard draft's or the

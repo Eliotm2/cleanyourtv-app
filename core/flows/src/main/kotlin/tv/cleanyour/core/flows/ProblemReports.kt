@@ -233,6 +233,7 @@ object ProblemReports {
             switchedOffByApp = attempt { d.ledger.switchedOffByUs(tv.id).toSet() }.getOrDefault(emptySet()),
             homeEarlier = home?.earlier(d.about.version, profile) == true,
             stockHomeBack = d.stockHomeBacks[tv.id],
+            restarts = ItWorked.facts(d, tv.id),
         )
     }
 

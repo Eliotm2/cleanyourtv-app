@@ -9,8 +9,10 @@ import tv.cleanyour.core.model.TvId
 // are made from what this phone stored, so the TV need not be on. The screen shows the exact text,
 // then copies it and opens the GitHub form, or hands it to the share sheet. Nothing is sent by the
 // app: the clipboard, the browser and the share sheet are the person's.
+// 0.4.8: CONFIRM ("confirm") is "Tell us it worked", the confirmation of a TV whose restarts this phone counted
+// (ItWorked); it needs a TV, like TV.
 enum class ReportKind(val key: String) {
-    TV("tv"), PROBLEM("problem");
+    TV("tv"), PROBLEM("problem"), CONFIRM("confirm");
 
     companion object { fun of(key: String): ReportKind? = entries.firstOrNull { it.key == key } }
 }
@@ -72,8 +74,8 @@ class ReportMachine(
         when (event) {
             // 0.3.3 D1: copied also when the report is in the link, in case the form opens without it
             // (a sign-in on the way can drop it). The screen says which way it goes.
-            ReportIntent.CopyAndOpen -> { effect(ManageEffect.Copy(after.text)); effect(ManageEffect.OpenUrl(after.url)); remember() }
-            ReportIntent.Share -> { effect(ManageEffect.Share(after.shareText.ifEmpty { after.text })); remember() }
+            ReportIntent.CopyAndOpen -> { effect(ManageEffect.Copy(after.text)); effect(ManageEffect.OpenUrl(after.url)); remember(); told() }
+            ReportIntent.Share -> { effect(ManageEffect.Share(after.shareText.ifEmpty { after.text })); remember(); told() }
             is ReportIntent.SaveIssue -> scope.launch { saveIssue(event.url) }
             ReportIntent.OpenIssue -> after.sent?.issueUrl?.let { effect(ManageEffect.OpenUrl(it)) }
             else -> {}
@@ -90,6 +92,13 @@ class ReportMachine(
             val r = SentReport(d.clock.nowMs(), state.value.sent?.issueUrl)
             attempt { d.sentReports.save(id, r) }.onSuccess { send(Sent(r)) }
         }
+    }
+
+    // 0.4.8: a confirmation that left the phone is remembered with the count it carried, so Manage says so.
+    private fun told() {
+        val id = tvId ?: return
+        if (state.value.kind != ReportKind.CONFIRM) return
+        scope.launch { attempt { d.restarts.told(id, d.clock.nowMs()) } }
     }
 
     private suspend fun saveIssue(text: String) {
@@ -112,6 +121,16 @@ class ReportMachine(
                 val compact = TvReport.compact(input)
                 val link = IssueLinks.tvSupport(input, compact)
                 Loaded(compact, link.url, true, link.reportInLink, share = TvReport.text(input), sent = tvId?.let { id -> attempt { d.sentReports.load(id) }.getOrNull() })
+            }
+        }
+        // 0.4.8: the confirmation block (TvReport.confirmation) in the confirmation form; none before a restart counted.
+        ReportKind.CONFIRM -> {
+            val input = ProblemReports.input(d, tvId)
+            val facts = input?.restarts?.takeIf { it.tally.held > 0 }
+            if (input == null || facts == null) Loaded("", "", available = false) else {
+                val text = TvReport.confirmation(d.about, input, facts)
+                val link = IssueLinks.confirmation(input, text)
+                Loaded(text, link.url, true, link.reportInLink, share = text)
             }
         }
         // Settings asks without a TV: the TV used last, when there is one (ProblemReports.build).

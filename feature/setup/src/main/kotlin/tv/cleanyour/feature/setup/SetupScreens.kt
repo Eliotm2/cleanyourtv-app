@@ -57,6 +57,7 @@ import tv.cleanyour.core.flows.IssueLinks
 import tv.cleanyour.core.flows.LookName
 import tv.cleanyour.core.flows.NothingWhy
 import tv.cleanyour.core.flows.Reconnect
+import tv.cleanyour.core.flows.RestartRead
 import tv.cleanyour.core.flows.RestartState
 import tv.cleanyour.core.flows.SetupActions
 import tv.cleanyour.core.flows.SetupExtras
@@ -916,6 +917,14 @@ fun DoneScreen(state: SetupState.Done, extras: SetupExtras, actions: SetupAction
             s.skipped.size == 1 -> Body(msg(R.string.done_skipped, "name" to s.skipped.single()), Modifier.padding(start = 4.dp, top = 12.dp))
             s.skipped.size > 1 -> Body(msg(R.string.done_skipped_many, "count" to s.skipped.size), Modifier.padding(start = 4.dp, top = 12.dp))
         }
+        // 0.4.8 (PLAN item 3): the look went to the TV: what the TV shows now, and one tap to send it again.
+        extras.doneShot?.let { png ->
+            ListGroup(Modifier.padding(top = 18.dp)) {
+                ListRow(stringResource(R.string.done_tv_now_title))
+                TvThumbnail(rememberPng(png), stringResource(R.string.done_tv_now_cd), Modifier.padding(start = 16.dp, end = 16.dp), label = null)
+                LinkRow(stringResource(R.string.done_tv_now_again), { actions.intent(SetupIntent.SendLookAgain) }, Modifier.padding(top = 4.dp))
+            }
+        }
         // Nothing changed, so there is nothing a restart could check.
         if (!nothing) RestartCard(state, extras, actions)
         extras.card?.takeIf { it.case == StopCase.NOT_BACK_AFTER_RESTART }?.let { c ->
@@ -966,14 +975,29 @@ private fun RestartCard(state: SetupState.Done, extras: SetupExtras, actions: Se
                 ListRow(title)
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     // UX finding 7: "the new one" only when it is; after a block or a failed switch
-                    // the home screen is the TV's own.
-                    CheckLine(stringResource(when {
-                        extras.helperOn && extras.doneHomeKept == null -> R.string.restart_progress_home_helper
-                        state.summary.homeScreenOn || extras.homeKept == null -> R.string.restart_progress_home
-                        else -> R.string.restart_progress_home_own
-                    }))
+                    // the home screen is the TV's own. 0.4.8: what the app read after the restart (Restarts).
+                    val read = extras.restartRead
+                    val failedLine = stringResource(R.string.restart_progress_failed)
+                    when {
+                        read == RestartRead.FAILED -> CheckLine(failedLine, state = CheckState.NONE, emphasised = true)
+                        read == RestartRead.HELD && !extras.helperOn -> CheckLine(stringResource(R.string.restart_progress_held))
+                        else -> CheckLine(stringResource(when {
+                            extras.helperOn && extras.doneHomeKept == null -> R.string.restart_progress_home_helper
+                            state.summary.homeScreenOn || extras.homeKept == null -> R.string.restart_progress_home
+                            else -> R.string.restart_progress_home_own
+                        }))
+                    }
                     if (extras.restartReenabled > 0) CheckLine(msg(R.string.restart_came_back, "count" to extras.restartReenabled))
-                    CheckLine(stringResource(R.string.restart_progress_good))
+                    if (read != RestartRead.FAILED) CheckLine(stringResource(R.string.restart_progress_good))
+                    // 0.4.8 (PLAN item 2): one tap tells us; the preview shows what goes, and only its Open GitHub sends it.
+                    if (read == RestartRead.HELD) {
+                        SecondaryButton(stringResource(R.string.done_tell_us), { actions.intent(SetupIntent.TellUsItWorked) }, Modifier.padding(top = 6.dp))
+                        Body(stringResource(R.string.done_tell_us_note))
+                    }
+                    if (read == RestartRead.FAILED) {
+                        Body(stringResource(R.string.done_restart_report_note))
+                        TertiaryButton(stringResource(R.string.stop_report), { actions.intent(SetupIntent.ReportRestartFailed(failedLine)) })
+                    }
                 }
             }
         }

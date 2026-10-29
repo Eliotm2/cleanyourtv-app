@@ -54,6 +54,7 @@ import tv.cleanyour.core.flows.Finishing
 import tv.cleanyour.core.flows.NoSetupActions
 import tv.cleanyour.core.flows.NothingWhy
 import tv.cleanyour.core.flows.Reconnect
+import tv.cleanyour.core.flows.RestartRead
 import tv.cleanyour.core.flows.RestartState
 import tv.cleanyour.core.flows.SetupExtras
 import tv.cleanyour.core.flows.SetupState
@@ -675,6 +676,11 @@ object SetupShots {
         Shot("done_restarting") { Setup(done(restart = RestartState.Restarting(NOW))) },
         Shot("done_restarting_slow") { Setup(done(restart = RestartState.Restarting(NOW)), connected.copy(restartSlow = true)) },
         Shot("done_back_after_restart") { Setup(done(restart = RestartState.Back(72_000)), connected.copy(restartReenabled = 2)) },
+        // 0.4.8 (Restarts): the restart held, with "Tell us it worked"; it failed, with Report a problem.
+        Shot("done_restart_held", 1100.dp) { Setup(done(restart = RestartState.Back(72_000)), connected.copy(restartRead = RestartRead.HELD)) },
+        Shot("done_restart_failed", 1100.dp) { Setup(done(restart = RestartState.Back(72_000)), connected.copy(restartRead = RestartRead.FAILED)) },
+        // 0.4.8 (PLAN item 3): "This is your TV now" after Setup sent the look.
+        Shot("done_tv_now", 1300.dp) { Setup(done(), connected.copy(doneShot = remember { fakeShot() })) },
         Shot("done_not_back") {
             val c = card(StopCase.NOT_BACK_AFTER_RESTART, R.string.stop_not_back_title, R.string.stop_not_back_body, R.string.stop_not_back_primary, R.string.stop_not_back_secondary)
             Setup(done(restart = RestartState.NotBack(300_000)), offline.copy(card = c.copy(body = c.body + "\n\n" + stringResource(R.string.stop_not_back_auto))))
