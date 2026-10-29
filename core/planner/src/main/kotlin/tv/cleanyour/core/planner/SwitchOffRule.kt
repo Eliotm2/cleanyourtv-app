@@ -6,6 +6,7 @@ import tv.cleanyour.core.model.PackageState
 import tv.cleanyour.core.model.Profile
 import tv.cleanyour.core.model.Snapshot
 import tv.cleanyour.core.ops.Denylist
+import tv.cleanyour.core.ops.HomePlaceholder
 import tv.cleanyour.core.spec.KnownLaunchers
 
 // What may be switched off (0.3.3, issue #10): one rule for the planner at plan time and for the
@@ -60,10 +61,17 @@ object SwitchOffRule {
     // WP4 (B5): when HOME answers with the system chooser, a placeholder or nothing at all, the TV
     // has not said which home screen it uses, so every known TV home screen (KnownLaunchers) counts
     // as one too, claimant or not.
+    //
+    // Issue #1944: a factory test app a tested list switches off (HomePlaceholder.FACTORY_HOMES_OFF)
+    // is no home screen as a mere claimant while HOME answers to a real home screen, so the list's
+    // line takes it off before the switch, as upstream's header says. It stays protected while HOME
+    // answers to it, or to the chooser, a placeholder or nothing.
     fun isHomeScreen(pkg: PackageName, snapshot: Snapshot): Boolean {
         val resolved = snapshot.home.resolved
-        if (resolved?.pkg == pkg || snapshot.home.claimants.any { it.component.pkg == pkg }) return true
-        return (resolved == null || StockHome.isPlaceholder(resolved)) && pkg in KnownLaunchers.byPackage
+        val undecided = resolved == null || StockHome.isPlaceholder(resolved)
+        if (resolved?.pkg == pkg) return true
+        if (snapshot.home.claimants.any { it.component.pkg == pkg } && (undecided || pkg !in HomePlaceholder.FACTORY_HOMES_OFF)) return true
+        return undecided && pkg in KnownLaunchers.byPackage
     }
 
     // A home screen app the person installed (issue #8: Projectivy, Wolf and the like): HOME or a

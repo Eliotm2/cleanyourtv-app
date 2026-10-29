@@ -32,6 +32,16 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   with the key the TV already allowed: no Allow prompt and no debugging step. Reconnect stays for
   when that does not work.
 
+### Remote buttons and Home
+- Xiaomi MiTV-MOOQ0: the list's Xiaomi factory test app, which also answers the Home button, now
+  really goes off before the TV's own home screen (#1944). Before, the app kept it on as if it were
+  the TV's home screen, so with the TV's own home screen off and the new one gone, Home landed on the
+  factory test screen. On any TV, a factory test app is never the home screen the app hands Home
+  back to, and the home screen switch takes the Xiaomi one off first where a list does not.
+- Skyworth SWTV-22AE-FHD: the list keeps Skyworth's daily manager, quick menu and My Apps on, which
+  the remote's custom (Daily) button needs (#1378). The Skyworth remote's hot key service and quick
+  menu are never switched off on any TV.
+
 ### Smaller fixes
 - After the Home button helper is switched off, the Home screen page no longer offers "Use the TV's
   own home screen" when it is Home already.

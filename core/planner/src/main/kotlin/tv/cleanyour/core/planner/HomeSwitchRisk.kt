@@ -189,8 +189,10 @@ object HomeSwitchRisk {
     // A Home claimant R0 takes as a placeholder: the chooser, a setup wizard (one that is on was
     // refused before this is asked), Android's own FallbackHome, or one in a package of the list
     // above. A class written out in full (the package's name in front) is the same class.
+    // Issue #1944: a factory test app is a placeholder to every other caller, but not one R0 takes:
+    // it answers Home at priority 0, as ours does, so for R0 it stays another home screen, as before.
     fun r0Placeholder(c: Component): Boolean {
-        if (!HomePlaceholder.isPlaceholder(c)) return false
+        if (!HomePlaceholder.isPlaceholder(c) || HomePlaceholder.isFactoryHome(c.pkg)) return false
         if ("FallbackHome" !in c.cls) return true
         val short = if (c.cls.startsWith(c.pkg.value + ".")) c.cls.removePrefix(c.pkg.value) else c.cls
         return Component(c.pkg, short) in AOSP_FALLBACK_HOMES || c.pkg in VENDOR_PLACEHOLDERS
