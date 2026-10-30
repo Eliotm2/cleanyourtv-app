@@ -3,6 +3,7 @@ package tv.cleanyour.app
 import tv.cleanyour.core.flows.StoreRules
 import tv.cleanyour.core.flows.UpdateChecker
 import tv.cleanyour.core.registry.ArtifactFetcher
+import tv.cleanyour.core.registry.FetchException
 import tv.cleanyour.core.registry.HttpFetcher
 import tv.cleanyour.core.trust.DownloadHosts
 
@@ -17,25 +18,67 @@ object Store : StorePorts {
 
     // D12: one GET on user action (Settings, "Check for updates"); "couldn't check" when GitHub
     // does not answer or the repository has no published release yet.
-    // Fork (Thomas): the feed is the fork's own releases (Eliotm2/cleanyourtv-app, built and signed
-    // every night by .github/workflows/thomas-sync.yml with the fork's key), so what it offers
-    // installs over this app. Upstream releases are signed with another key and are never offered.
-    override fun updateChecker(http: HttpFetcher) = UpdateChecker { current ->
-        val r = http.get(RELEASES_URL, null, null)
-        if (r.code != 200) { r.body?.close(); null } else {
-            val body = r.body?.use { it.readBytes().decodeToString() } ?: return@UpdateChecker null
-            val tag = Regex("\"tag_name\"\\s*:\\s*\"v?([0-9][0-9A-Za-z.\\-]*)\"").find(body)?.groupValues?.get(1) ?: return@UpdateChecker null
-            if (forkNewer(tag, current)) tag else ""
-        }
+    //
+    // 0.4.7 (issue #818, "Couldn't check for updates" on some phones, Android 17 among them): the API's
+    // unauthenticated limit is 60 requests an hour per IP address, which a phone behind a carrier's shared
+    // address (CGNAT) or a VPN shares with everyone else there, and the API then answers 403 or 429 and the check
+    // said only "couldn't check". So when the API gives no tag, the releases feed on github.com (no API limit) is
+    // read instead. When neither gives a tag, the diagnostics log (and so a problem report) says why, for each.
+    // Fork (Thomas): both read the fork's own releases (Eliotm2/cleanyourtv-app, built and signed by its
+    // workflows with the fork's key), so what is offered installs over this app; upstream releases are signed
+    // with another key and are never offered. Tags are <launcher version>-thomas.N, compared by forkNewer.
+    override fun updateChecker(http: HttpFetcher) = updateChecker(http) { CytLog.i(it) }
+
+    internal fun updateChecker(http: HttpFetcher, log: (String) -> Unit) = UpdateChecker { current ->
+        val (api, apiWhy) = read(http, RELEASES_URL)
+        val fromApi = api?.let { Regex("\"tag_name\"\\s*:\\s*\"v?([0-9][0-9A-Za-z.\\-]*)\"").find(it)?.groupValues?.get(1) }
+        val tag = fromApi ?: run {
+            val (feed, feedWhy) = read(http, FEED_URL)
+            val fromFeed = feed?.let { latestInFeed(it) }
+            if (fromFeed == null) log("settings: update check failed: api ${apiWhy ?: "no tag"}, feed ${feedWhy ?: "no tag"}")
+            else log("settings: update check used the releases feed (api ${apiWhy ?: "no tag"})")
+            fromFeed
+        } ?: return@UpdateChecker null
+        if (forkNewer(tag, current)) tag else ""
     }
 
-    // Fork (Thomas): "0.4.6.1-thomas.1" > "0.4.6-thomas.2" > "0.4.6-thomas.1": the upstream version
-    // first, then the fork's own number. A version without "-thomas.N" counts as thomas.0.
+    // A body, or why there is none: the HTTP code, or the fetcher's failure kind and its words (no URL, no
+    // address: FetchException messages name only the step, as "TLS failed: SSLHandshakeException").
+    private suspend fun read(http: HttpFetcher, url: String): Pair<String?, String?> = try {
+        val r = http.get(url, null, null)
+        if (r.code != 200) { r.body?.close(); null to "HTTP ${r.code}" }
+        else r.body?.use { bounded(it) }?.let { it to null } ?: (null to "empty body")
+    } catch (e: FetchException) {
+        null to "${e.failure.name.lowercase()} (${e.message})"
+    } catch (e: Exception) {
+        null to e.javaClass.simpleName
+    }
+
+    // At most MAX_BODY bytes (InputStream.readNBytes needs Android 13).
+    private fun bounded(input: java.io.InputStream): String {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(16 * 1024)
+        while (out.size() < MAX_BODY) {
+            val n = input.read(buf, 0, minOf(buf.size, MAX_BODY - out.size()))
+            if (n < 0) break
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray().decodeToString()
+    }
+
+    // Fork (Thomas): the newest release in the fork's Atom feed (newest first) whose tag is a fork version
+    // ("3.2-thomas.1"); anything else there is not one of ours.
+    internal fun latestInFeed(atom: String): String? =
+        Regex("/releases/tag/v?([0-9][0-9A-Za-z.-]*)\"").findAll(atom).map { it.groupValues[1] }
+            .firstOrNull { Regex("[0-9][0-9.]*-thomas\\.\\d+").matches(it) }
+
+    // Fork (Thomas): "3.2-thomas.1" > "0.4.6.1-thomas.9" > "0.4.6-thomas.2": the version before "-thomas"
+    // first (up to four parts), then the fork's own number. A version without "-thomas.N" counts as thomas.0.
     internal fun forkNewer(tag: String, current: String): Boolean {
         fun parts(v: String): List<Int> {
             val up = v.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
             val n = Regex("-thomas\\.(\\d+)").find(v)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-            return List(4) { up.getOrElse(it) { 0 } } + n   // upstream versions have up to four parts (0.4.6.1)
+            return List(4) { up.getOrElse(it) { 0 } } + n
         }
         val a = parts(tag)
         val b = parts(current)
@@ -63,5 +106,7 @@ object Store : StorePorts {
     override fun addOnFetcher(make: () -> ArtifactFetcher): ArtifactFetcher = make()
 
     const val RELEASES_URL = "https://api.github.com/repos/Eliotm2/cleanyourtv-app/releases/latest"
+    const val FEED_URL = "https://github.com/Eliotm2/cleanyourtv-app/releases.atom"
+    private const val MAX_BODY = 2 * 1024 * 1024
     const val RELEASE_PAGE = "https://github.com/Eliotm2/cleanyourtv-app/releases/latest"
 }

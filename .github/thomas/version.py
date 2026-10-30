@@ -15,7 +15,7 @@ path = "app/build.gradle.kts"
 text = open(path, encoding="utf-8").read()
 code_re = re.compile(r"versionCode\s*=\s*(\d+)")
 name_re = re.compile(r'versionName\s*=\s*"([^"]+)"')
-version_line = re.compile(r"\s*(versionCode|versionName)\s*=")
+version_line = re.compile(r"\s*(versionCode\s*=|versionName\s*=|//)")   # comments in the block too (0.4.7)
 
 blocks = list(re.finditer(r"<<<<<<< [^\n]*\n(.*?)=======\n(.*?)>>>>>>> [^\n]*\n", text, re.S))
 if len(blocks) > 1:

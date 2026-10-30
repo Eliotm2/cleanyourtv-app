@@ -1,6 +1,6 @@
 # Fork « thomas » de l'appli téléphone Clean Your TV
 
-Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.6.1, MIT).
+Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.7, MIT).
 Identifiant d'appli `fr.thomas.cleanyourtv` (amont : `tv.cleanyour.app`), nom « Clean Your TV · Thomas ». Elle s'installe
 à côté de l'appli d'origine, qui garde son propre point de restauration.
 
@@ -35,6 +35,9 @@ l'appli amont (0.4.6.1-thomas.1) ; 3.x passe devant, la mise à jour est donc pr
   gardé sur le téléphone (`ForkGreeting`, fichier `fork-greeting-name.txt`) et ajouté à chaque look envoyé
   (`Look.encode` → `greeting_name`, que le launcher amont lit déjà : « BONSOIR, THOMAS »). Tant qu'aucun nom n'a été
   enregistré, les looks partent tels quels ; enregistré vide, la clé est omise.
+- **Vérification de mise à jour, repli sur le flux** (3.2-thomas.2, d'après la 0.4.7 amont) : quand l'API GitHub refuse
+  (60 requêtes par heure et par adresse, partagées sur un réseau mobile ou un VPN), l'appli lit le flux
+  `releases.atom` du fork ; son dernier tag `-thomas.N` est la dernière version. La raison d'un échec va au journal.
 - **Vérification de mise à jour** (0.4.0-thomas.1) : « Check for updates » lit les releases de ce fork
   (`Eliotm2/cleanyourtv-app`), signées avec la clé du fork, et ouvre la page de la dernière. Une version amont n'est
   jamais proposée : elle ne pourrait pas s'installer par-dessus cette clé. Ordre : la version amont, puis le numéro

@@ -15,7 +15,8 @@ import tv.cleanyour.core.spec.Theme
 data class Choices(val kept: Set<PackageName>, val extraOff: Set<PackageName>, val dock: List<PackageName>?, val theme: Theme?,
     val installLauncher: Boolean, val takeover: Boolean, val replaceLauncherSigner: Boolean, val keepDebuggingOn: Boolean,
     val curtain: Boolean = true,   // RFC-CURTAIN-1: show the progress on the TV
-    val wizardWifi: WizardWifi = WizardWifi.UNKNOWN)   // RFC-LAUNCHER-1 (D3): may the takeover switch the setup wizard off
+    val wizardWifi: WizardWifi = WizardWifi.UNKNOWN,   // RFC-LAUNCHER-1 (D3): may the takeover switch the setup wizard off
+    val homeHelper: Boolean = false)   // RFC-HELPER-1 (test build): the Home button helper instead of the home screen switch
 // RFC-LAUNCHER-1 (D3): whether the setup wizard saved the TV's Wi-Fi network (dumpsys wifi, SavedWifiOwners). Switching the
 // wizard off deletes a network it saved, so the takeover switches it off only when the TV says NOT_OWNER: others saved its
 // networks, or none is saved (a cable). UNKNOWN: the TV could not tell (RF-LAUNCHER-240 F6, F14).
@@ -24,7 +25,8 @@ enum class PlanKind { SETUP, PUT_BACK, SWITCH_OFF, LEFTOVERS, THEME, ADD_MODULE,
     UNDO_EVERYTHING, BEFORE_FACTORY_RESET, DEBUG_OFF, WRITE_RESTORE_POINT, REBOOT,   // R0: 11 (was kind: String); REBOOT: RFC-W8-5
     UPDATE_LAUNCHER,                                                                  // RFC-LAUNCHER-1 (D4)
     INSTALL_APK,                                                                      // fork (Thomas): an APK the person picked on the phone
-    ALLOW_AUTO_START }                                                                // fork (Thomas): TCL auto-start permission for the launcher
+    ALLOW_AUTO_START,                                                                // fork (Thomas): TCL auto-start permission for the launcher
+    HOME_HELPER_OFF }                                                                 // RFC-HELPER-1: Manage's "Switch off" of the Home button helper
 sealed interface PlanRequest {
     data class Setup(val resolution: ProfileResolution, val choices: Choices, val launcher: LauncherArtifact, val level: Level,
         val config: BlobRef? = null, val wallpaper: BlobRef? = null,   // RFC-DOCK-1: config = encode(DockLayers.applyTo(theme doc, dock)) in the BlobStore
@@ -42,7 +44,8 @@ sealed interface PlanRequest {
     data object DebugOff : PlanRequest
     data class WriteRestorePoint(val restorePointJson: BlobRef, val restoreTxt: BlobRef) : PlanRequest   // R0: 11 D44; pushes only, runs after every other plan
     data object Reboot : PlanRequest   // RFC-W8-5: the D24 restart test, journaled like every write, not gated (D17)
-    data class UpdateLauncher(val launcher: LauncherArtifact) : PlanRequest   // RFC-LAUNCHER-1 (D4): the pin over our older launcher, in place
+    data class UpdateLauncher(val launcher: LauncherArtifact) : PlanRequest     // RFC-LAUNCHER-1 (D4): the pin over our older launcher, in place
+    data object HomeHelperOff : PlanRequest   // RFC-HELPER-1: our HomeKeyService out of the accessibility list, nothing else
     // Fork (Thomas): an APK picked on the phone, inspected there (ApkInfo); label is the file name for the narration.
     data class InstallApk(val apk: BlobRef, val info: ApkInfo, val label: String) : PlanRequest
     // Fork (Thomas): let the launcher's services start at boot (TCL firmware refuses sideloaded services otherwise).

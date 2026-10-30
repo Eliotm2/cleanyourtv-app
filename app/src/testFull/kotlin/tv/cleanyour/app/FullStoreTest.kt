@@ -69,6 +69,8 @@ class FullStoreTest {
     }
 
     @Test fun theUpstreamVersionComesFirstThenTheForksNumber() {
+        assertTrue(Store.forkNewer("3.2-thomas.1", "0.4.6.1-thomas.1"))   // numbered after the launcher from 3.2-thomas.1
+        assertTrue(Store.forkNewer("3.2-thomas.2", "3.2-thomas.1"))
         assertTrue(Store.forkNewer("0.4.1-thomas.1", "0.4.0-thomas.9"))
         assertTrue(Store.forkNewer("0.4.6.1-thomas.1", "0.4.6-thomas.9"))
         assertTrue(!Store.forkNewer("0.4.6-thomas.9", "0.4.6.1-thomas.1"))
@@ -79,6 +81,48 @@ class FullStoreTest {
     }
 
     // A four-part hotfix (0.4.6.1): 0.4.6 is offered it; the 0.4.7-beta1 test build, already past it, is not.
+    // 0.4.7 (issue #818): the API's 60 requests an hour per address run out behind a shared address (CGNAT, a VPN),
+    // and it answers 403. The releases feed on github.com has no such limit. When neither answers, the diagnostics
+    // log says why for each. Fork (Thomas): the fork's feed, whose newest "-thomas.N" tag is the latest release.
+    private class ByUrl(val answers: Map<String, Any>) : HttpFetcher {
+        val urls = mutableListOf<String>()
+        override suspend fun get(url: String, etag: String?, rangeFrom: Long?): HttpResponse {
+            urls += url
+            return when (val a = answers[url]) {
+                is Exception -> throw a
+                is Pair<*, *> -> (a.second as String).let { HttpResponse(a.first as Int, null, ByteArrayInputStream(it.encodeToByteArray()), it.length.toLong()) }
+                else -> HttpResponse(404, null, null, null)
+            }
+        }
+    }
+    private val feed = """<feed><entry><link rel="alternate" type="text/html" href="https://github.com/Eliotm2/cleanyourtv-app/releases/tag/3.2-thomas.2"/></entry>
+        <entry><link rel="alternate" type="text/html" href="https://github.com/Eliotm2/cleanyourtv-app/releases/tag/3.2-thomas.1"/></entry>
+        <entry><link rel="alternate" type="text/html" href="https://github.com/Eliotm2/cleanyourtv-app/releases/tag/0.4.6.1-thomas.1"/></entry></feed>"""
+
+    @Test fun aRateLimitedApiFallsBackToTheReleasesFeed() = runBlocking {
+        val lines = mutableListOf<String>()
+        val http = ByUrl(mapOf(Store.RELEASES_URL to (403 to """{"message":"API rate limit exceeded"}"""), Store.FEED_URL to (200 to feed)))
+        assertEquals("3.2-thomas.2", Store.updateChecker(http) { lines += it }.latestNewerThan("3.2-thomas.1"))
+        assertEquals(listOf(Store.RELEASES_URL, Store.FEED_URL), http.urls)
+        assertEquals(listOf("settings: update check used the releases feed (api HTTP 403)"), lines)
+        assertEquals("", Store.updateChecker(http) {}.latestNewerThan("3.2-thomas.2"))
+        assertEquals("3.2-thomas.2", Store.updateChecker(http) {}.latestNewerThan("0.4.6.1-thomas.1"))
+        assertEquals(null, Store.latestInFeed("<feed></feed>"))
+        assertEquals(null, Store.latestInFeed("""<feed><entry><link href="https://github.com/x/y/releases/tag/v0.4.7"/></entry></feed>"""), "not a fork tag")
+    }
+
+    @Test fun whenNeitherAnswersTheLogSaysWhy() = runBlocking {
+        val lines = mutableListOf<String>()
+        val tls = tv.cleanyour.core.registry.FetchException(tv.cleanyour.core.registry.FetchFailure.HTTP_ERROR, null, "TLS failed: SSLHandshakeException: chain refused")
+        val http = ByUrl(mapOf(Store.RELEASES_URL to tls, Store.FEED_URL to (429 to "")))
+        assertEquals(null, Store.updateChecker(http) { lines += it }.latestNewerThan("3.2-thomas.1"))
+        assertEquals(listOf("settings: update check failed: api http_error (TLS failed: SSLHandshakeException: chain refused), feed HTTP 429"), lines)
+        // The API's answer is used first when it has a tag: one request.
+        val ok = ByUrl(mapOf(Store.RELEASES_URL to (200 to """{"tag_name":"3.2-thomas.2"}""")))
+        assertEquals("3.2-thomas.2", Store.updateChecker(ok) {}.latestNewerThan("3.2-thomas.1"))
+        assertEquals(listOf(Store.RELEASES_URL), ok.urls)
+    }
+
     @Test fun aFourPartHotfixIsOfferedToTheReleaseBeforeItOnly() = runBlocking {
         fun latest(tag: String, current: String) = runBlocking { Store.updateChecker(OneAnswer(200, "{\"tag_name\":\"v$tag\"}")).latestNewerThan(current) }
         assertTrue(Store.offered("0.4.6.1", "0.4.6"))
