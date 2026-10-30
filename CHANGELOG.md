@@ -2,63 +2,18 @@
 
 All notable changes to the app. Versions follow [semantic versioning](https://semver.org/).
 
-## 0.4.8 (unreleased)
+## 0.4.7 (2026-10-30)
 
-### Restarts the app counts
-- On a TV whose home screen the app switched, or whose Home button helper it switched on, each
-  connect reads the TV's boot id beside the Home check Manage already does. A restart with the new
-  home screen still answering Home counts as held; the TV's own back after a restart counts as
-  failed. The count is kept on the phone for each TV, with the first and last date and the app
-  that counted. Nothing new is sent to the TV, and nothing is changed on it.
-- Done's restart check says what it read: "The new home screen held through the restart." or "The
-  TV's own home screen came back after the restart.", where it said the new one is on before.
-
-### Tell us it worked
-- After a restart that held, Done and Manage offer "Tell us it worked". It opens a preview of a short
-  fixed block (the app and its build, the TV's model and Android version, the home path, restarts
-  held and failed, the look's route) and then GitHub's new confirmation form with it filled in.
-  The block has no names, addresses, serial numbers or keys, and nothing is sent until you post it.
-  Manage remembers when you told us.
-- A restart that failed offers "Report a problem" instead, and every problem report of a TV the app
-  switched has the same Restarts lines.
-
-### Your TV now
-- After a look goes to the TV, from Setup or from the Home screen page, the app shows the TV's
-  screenshot under "This is your TV now", with "Not right? Send it again".
-
-### Manage reconnects by itself
-- Manage keeps the TV's connection while it is on screen, so it no longer shows "Offline" after a
-  minute on another page. When the TV restarts or the app comes back, Manage reconnects by itself
-  with the key the TV already allowed: no Allow prompt and no debugging step. Reconnect stays for
-  when that does not work.
-
-### Remote buttons and Home
-- Xiaomi MiTV-MOOQ0: the list's Xiaomi factory test app, which also answers the Home button, now
-  really goes off before the TV's own home screen (#1944). Before, the app kept it on as if it were
-  the TV's home screen, so with the TV's own home screen off and the new one gone, Home landed on the
-  factory test screen. On any TV, a factory test app is never the home screen the app hands Home
-  back to, and the home screen switch takes the Xiaomi one off first where a list does not.
-- Skyworth SWTV-22AE-FHD: the list keeps Skyworth's daily manager, quick menu and My Apps on, which
-  the remote's custom (Daily) button needs (#1378). The Skyworth remote's hot key service and quick
-  menu are never switched off on any TV.
-- A TV whose Home answers to a home screen we don't know, ranked above ours (an operator's launcher
-  such as Jio's on the JMSB200A), keeps its own home screen: Android would not let ours take Home
-  there (#2028). And when an undo finds Home back where it was before the run, it finishes instead
-  of pausing on "undo step failed".
-- The MOKA board sold under Panasonic and other brands (maker SCBC, devices R3 and R4) gets no home
-  screen switch, like the rest of that family.
-
-### Reports
-- Reports and "Copy error" show the app's version again. A four-part version such as 0.4.6.1 looked
-  like a network address, so it was masked as "App: [address]".
-
-### Smaller fixes
-- After the Home button helper is switched off, the Home screen page no longer offers "Use the TV's
-  own home screen" when it is Home already.
-- The Look sheet no longer offers "Put it on the TV" when nothing changed; it says the TV has this
-  look.
-
-## 0.4.7 (unreleased)
+### Home screen
+- More TVs with Google's Android TV home screen now get the new home screen with their setup
+  wizard left on, as Xiaomi and Redmi TVs on Android 9 to 11 have since 0.4.6: OnePlus TVs on
+  Android 11, Sony TVs on Android 8, Hisense TVs on Android 9, Homatics and MECOOL boxes on
+  Android 14, the Xiaomi MiTV-MZTU1 on Android 14, and the "My" Android TV sets (yeoksam, shandao
+  and tokyo) on Android 11. At least two testers on each said the new home screen was still there
+  after a restart of the TV, with a test build, and none said it did not hold. Thank you!
+- Every safety check stays for them: a TV whose setup wizard or another home screen app answers
+  the Home button, or where a system service holds a Home placeholder of its own, keeps its own
+  home screen, and so does one on a list we are still trying.
 
 ### When the TV keeps its own home screen
 - "What we found" now says first whether the TV keeps its own home screen, with the reason in one
@@ -122,6 +77,8 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
 - On a TV whose home screen was kept on purpose, the Home screen page says this is by design
   before "Report a problem", with a link to the TV list page.
 - Copy that assumed a GitHub issue ("ask us in your issue") now says "tell us with Report a problem".
+- Reports and "Copy error" show the app's version again. A four-part version such as 0.4.6.1 looked
+  like a network address, so it was masked as "App: [address]".
 
 ### Elsewhere
 - Restore point no longer asks whether to keep or remove the new home screen on a TV where it was
@@ -134,12 +91,75 @@ All notable changes to the app. Versions follow [semantic versioning](https://se
   people), the app reads the releases feed instead. When both fail, a problem report says why.
 - README: a "What your TV gets" section near the top, with the TV list page.
 
-### Test build only
+### Restarts the app counts
+- On a TV whose home screen the app switched, each connect reads the TV's boot id beside the Home
+  check Manage already does. A restart with the new home screen still answering Home counts as
+  held; the TV's own back after a restart counts as failed. The count is kept on the phone for each TV, with the first and last date and the app
+  that counted. Nothing new is sent to the TV, and nothing is changed on it.
+- Done's restart check says what it read: "The new home screen held through the restart." or "The
+  TV's own home screen came back after the restart.", where it said the new one is on before.
+
+### Tell us it worked
+- After a restart that held, Done and Manage offer "Tell us it worked". It opens a preview of a short
+  fixed block (the app and its build, the TV's model and Android version, the home path, restarts
+  held and failed, the look's route) and then GitHub's new confirmation form with it filled in.
+  The block has no names, addresses, serial numbers or keys, and nothing is sent until you post it.
+  Manage remembers when you told us.
+- A restart that failed offers "Report a problem" instead, and every problem report of a TV the app
+  switched has the same Restarts lines.
+
+### Your TV now
+- After a look goes to the TV, from Setup or from the Home screen page, the app shows the TV's
+  screenshot under "This is your TV now", with "Not right? Send it again".
+
+### Manage reconnects by itself
+- Manage keeps the TV's connection while it is on screen, so it no longer shows "Offline" after a
+  minute on another page. When the TV restarts or the app comes back, Manage reconnects by itself
+  with the key the TV already allowed: no Allow prompt and no debugging step. Reconnect stays for
+  when that does not work.
+
+### Manage after a network change
+- Manage no longer waits forever when the phone's Wi-Fi is not the one the TV was set up on (a new
+  or reset router, the other Wi-Fi band, a mesh point). It looks for the TV at its saved address
+  and on the network the phone is on, and only your own TV can answer. On a network other than
+  the setup's, the app never shows an "Allow USB debugging?" prompt on a TV it finds there.
+- The waiting screen says which case it is: the phone is not on Wi-Fi, the TV is asking you to
+  allow this phone, or debugging is off because the app switched it off when it was done. "Show
+  details" shows live what the app sees, and after 30 seconds with no answer, what else to try.
+- "Connection details", on the waiting screen and in App settings, checks the Wi-Fi and your TVs
+  and makes a short text to copy or share. It has no full addresses, Wi-Fi names, serial numbers
+  or keys.
+
+### Remote buttons and Home
+- Xiaomi MiTV-MOOQ0: the list's Xiaomi factory test app, which also answers the Home button, now
+  really goes off before the TV's own home screen (#1944). Before, the app kept it on as if it were
+  the TV's home screen, so with the TV's own home screen off and the new one gone, Home landed on the
+  factory test screen. On any TV, a factory test app is never the home screen the app hands Home
+  back to, and the home screen switch takes the Xiaomi one off first where a list does not.
+- Skyworth SWTV-22AE-FHD: the list keeps Skyworth's daily manager, quick menu and My Apps on, which
+  the remote's custom (Daily) button needs (#1378). The Skyworth remote's hot key service and quick
+  menu are never switched off on any TV.
+- A TV whose Home answers to a home screen we don't know, ranked above ours (an operator's launcher
+  such as Jio's on the JMSB200A), keeps its own home screen: Android would not let ours take Home
+  there (#2028). And when an undo finds Home back where it was before the run, it finishes instead
+  of pausing on "undo step failed".
+- The MOKA board sold under Panasonic and other brands (maker SCBC, devices R3 and R4) gets no home
+  screen switch, like the rest of that family.
+
+### Smaller fixes
+- The Look sheet no longer offers "Put it on the TV" when nothing changed; it says the TV has this
+  look.
+
+### Test builds only (not in this release)
 - The Home button helper (opt-in in Customise, with its consent): the TV's own home screen and its
   setup wizard stay on, so casting keeps working, and the Home button opens the new home screen.
   What we found, Customise, Done, Manage and the Home screen page say so instead of "the TV keeps
   its own home screen", and the helper's Switch off replaces "Use the TV's own home screen". Its
   look goes through the launcher's ThemeProvider where the look does.
+- After the Home button helper is switched off, the Home screen page no longer offers "Use the TV's
+  own home screen" when it is Home already.
+- On a TV that was cleaned before, "What we found" with nothing to switch off now shows Customise
+  too, so the Home button helper can be switched on there (#251).
 
 ## 0.4.6.1 (2026-10-28)
 
