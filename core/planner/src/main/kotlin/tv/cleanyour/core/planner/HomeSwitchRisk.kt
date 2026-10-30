@@ -84,19 +84,23 @@ object HomeSwitchRisk {
 
     // 0.4.7: where a release gives R0, as a reviewed table of graduated entries (research/release-0.4.7/
     // R0-GRADUATION.md keeps the candidates and their counts). An entry is a brand or manufacturer (any of `makers`,
-    // case ignored), an Android SDK range, optionally only some models (`models`, by ro.product.model) and sets held
-    // out (`excludedDevices`, by ro.product.device). The rest of R0 (the wizard no Home claimant, tvlauncher on, the
+    // case ignored), an Android SDK range, optionally only some models (`models`, by ro.product.model), only some
+    // sets (`devices`, by ro.product.device, for a brand string too generic to stand alone) and sets held out
+    // (`excludedDevices`, by ro.product.device). The rest of R0 (the wizard no Home claimant, tvlauncher on, the
     // placeholders) and every incident block (VENDOR_HOME, OTHER_HOME, PATCHWALL_FEEDS, HELD_OUT, candidates never
     // with R0) apply to every entry. The test build drops the table (ANY_BRAND_BUILD) and keeps the rest.
     //
     // Graduation rule (owner, 2026-10-28; 2026-10-29: 2 for a new Android version too, it was 3): a brand on an
     // Android version needs 2 confirmed testers. A confirmation is the tester's own words that the new home
     // screen was still there after a restart of the TV, on a test build. Each entry cites its confirming issues.
+    // 0.4.7 (stable): only confirmations whose switch was R0 count for a row. A restart that held under the Home
+    // button helper (a test build's opt-in, "Home path: helper") or on a tested list says nothing about R0.
     data class Graduated(val makers: Set<String>, val sdks: IntRange, val models: Set<String> = emptySet(),
-                         val excludedDevices: Set<String> = emptySet(), val why: String) {
+                         val devices: Set<String> = emptySet(), val excludedDevices: Set<String> = emptySet(), val why: String) {
         fun maker(f: DeviceFacts): Boolean = makers.any { it.equals(f.brand, ignoreCase = true) || it.equals(f.manufacturer, ignoreCase = true) }
         fun covers(f: DeviceFacts): Boolean = maker(f) && f.sdk in sdks &&
-            (models.isEmpty() || models.any { it.equals(f.model, ignoreCase = true) }) && excludedDevices.none { it.equals(f.device, ignoreCase = true) }
+            (models.isEmpty() || models.any { it.equals(f.model, ignoreCase = true) }) &&
+            (devices.isEmpty() || devices.any { it.equals(f.device, ignoreCase = true) }) && excludedDevices.none { it.equals(f.device, ignoreCase = true) }
     }
 
     val GRADUATED: List<Graduated> = listOf(
@@ -105,8 +109,38 @@ object HomeSwitchRisk {
         // MSSP0 on 9, AESP0 on 10, MOOQ1, MOOQ3 and AYFR0 on 11 (issues #1119, #1279 among them) and upstream's AXFR0
         // and AXFR1 on 11. The MiTV-AXSO2 (dangalUHD) on 11 is held out in every build (HELD_OUT, issue #945).
         Graduated(XIAOMI_MAKERS, 28..30, why = "Xiaomi and Redmi, Android 9 to 11 (0.4.6)"),
-        // Not yet: Xiaomi MiTV-MZTU1 (stepup) on Android 14. It needs 2 testers who said the home screen stayed
-        // after a restart; #1505 (beta3) said so, #868 counts too (confirmations.md). R0-GRADUATION.md has the entry.
+        // 0.4.7 rows, from research/release-0.4.7/confirmations.md (2026-10-30), counting the R0 confirmations only.
+        // Xiaomi MiTV-MZTU1 (stepup) on Android 14: #1505 (0.4.6-beta3), #868 (0.4.6-beta2), #1877 and #2809
+        // (0.4.7-beta3), four testers, all on this model. The other Android 14 Xiaomi confirmations (MiTV-AFKR0,
+        // AXFU0, AXTU0, MOOR2, and #2517 on an MZTU1) held under the Home button helper, not R0, so only this model.
+        // Android 12 and 13 have no confirmation; the MIBOX4 on Android 12 did not hold (#1273).
+        Graduated(XIAOMI_MAKERS, 34..34, models = setOf("MiTV-MZTU1"), why = "Xiaomi MiTV-MZTU1, Android 14 (0.4.7)"),
+        // OnePlus on Android 11: the D00 (Dubai) in #235 (0.4.6-beta2) and #2420, the C00 (Cebu) in #2360, #2492 and
+        // #2524 (0.4.7-beta3, Home path R0). Five testers, no failure.
+        Graduated(setOf("OnePlus"), 30..30, why = "OnePlus, Android 11 (0.4.7)"),
+        // "My" on Android 11, model "Android TV": a brand string the board makers print for several shop brands
+        // (#864's is a Cecotec), so only the three sets the testers have: yeoksam (#673, 0.4.6-beta2), shandao (#864,
+        // 0.4.6-beta2, and #2367, 0.4.7-beta3) and tokyo (#1546, 0.4.7-beta1). Four testers, no failure.
+        Graduated(setOf("My"), 30..30, devices = setOf("yeoksam", "shandao", "tokyo"), why = "My Android TV (yeoksam, shandao, tokyo), Android 11 (0.4.7)"),
+        // Hisense on Android 9: the HiSmart 4K ATV4 (xinhaoshan) in #1388 (0.4.6-beta2) and #2814 (0.4.7-beta3, Home
+        // path R0), two testers on two phones. Its FallbackHome (com.android.boot.fallbackhome) is one R0 takes.
+        Graduated(setOf("Hisense"), 28..28, why = "Hisense, Android 9 (0.4.7)"),
+        // Homatics on Android 14: the Box R 4K Plus (YYJ, SEI Robotics) in #1094 and #654 (0.4.6-beta2), two testers
+        // on two phones. By the brand only: SEI Robotics also builds the TiVo Stream 4K, which did not hold (#832, #1518).
+        Graduated(setOf("Homatics"), 34..34, why = "Homatics, Android 14 (0.4.7)"),
+        // MECOOL on Android 14: the LEAP-S1 (LAS) in #2396 (0.4.7-beta3, the #1883 tester) and the 4K Android TV Box
+        // (YYC) in #2522 (0.4.7-beta4), both Home path R0. By the brand only, not the board maker (SkyworthDigital).
+        Graduated(setOf("MECOOL"), 34..34, why = "MECOOL, Android 14 (0.4.7)"),
+        // Sony on Android 8: the BRAVIA 4K GB ATV3 (BRAVIA_ATV3_4K) in #1219 (0.4.6-beta2) and #1585 (0.4.7-beta1),
+        // two testers on two phones and two firmware builds. Sony's other versions have no row (#1544 on Android 12
+        // failed its check); the BRAVIA VU3 keeps REMOTE_BUTTONS through its exact list.
+        Graduated(setOf("Sony"), 26..26, why = "Sony, Android 8 (0.4.7)"),
+        // Not graduated in 0.4.7 (research/release-0.4.7/confirmations.md, R0-GRADUATION.md): TCL on Android 11 and
+        // realme on Android 14 (a tester's home screen did not hold: #1799, #2061, #2082; #2126); Kogan on Android 11
+        // (#881, #138: #138 is listed against it in R0-GRADUATION.md, and Changhong boards failed under realme (#2126)
+        // and TD Systems (#577) on Android 14); and SHARP on Android 11 and 14, Hisense on Android 11, Strong, THOMSON and
+        // google on Android 14, whose count was met with Home button helper confirmations
+        // (and, for SHARP on Android 11, #17's own launcher app) but has under 2 for R0.
     )
 
     // The release's R0 scope: a graduated entry covers the TV.
@@ -232,8 +266,8 @@ object HomeSwitchRisk {
         r0Blocker(facts, snapshot, anyBrand) == null
 
     fun r0Blocker(facts: DeviceFacts, snapshot: Snapshot, anyBrand: Boolean = anyBrandNow): R0Blocker? {
-        // 0.4.7: BRAND, no graduated entry names the TV's maker; SCOPE, one does but not this Android version or
-        // model, or the set is held out (in every build).
+        // 0.4.7: BRAND, no graduated entry names the TV's maker; SCOPE, one does but not this Android version,
+        // model or set, or the set is held out (in every build).
         if (!anyBrand && GRADUATED.none { it.maker(facts) }) return R0Blocker.BRAND
         if ((!anyBrand && !graduated(facts)) || heldOut(facts)) return R0Blocker.SCOPE
         fun on(p: PackageName) = snapshot.packages[p]?.enabled.let { it != EnabledState.DISABLED_USER && it != EnabledState.DISABLED }
