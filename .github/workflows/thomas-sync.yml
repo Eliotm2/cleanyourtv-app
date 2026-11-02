@@ -105,7 +105,7 @@ jobs:
           TAG: ${{ steps.sync.outputs.tag }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          title="Reprise de ${TAG:-l'original} : à regarder"
+          title="Reprise de ${TAG:-la version amont} : à regarder"   # no quote inside ${...}: bash reads it as one
           body=$( [ -f "$RUNNER_TEMP/reason.md" ] && cat "$RUNNER_TEMP/reason.md" || echo "La compilation ou les tests ont échoué." )
           body="$body"$'\n\n'"Rien n'a été publié ; la version installée reste valable. Détail : $RUN"
           existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')

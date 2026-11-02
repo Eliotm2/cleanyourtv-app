@@ -45,7 +45,9 @@ fi
 
 # ---- 2. the fork's launcher -----------------------------------------------------------------------
 pinned=$(sed -n '/object PinnedLauncher/,/^}/s/.*const val VERSION_NAME = "\([^"]*\)".*/\1/p' "$pins")
-release=$(gh api "repos/$launcher_repo/releases/latest" --jq .tag_name 2>/dev/null || true)
+# gh prints the error body on stdout when there is no release yet (404): keep only a real launcher-* tag.
+release=$(gh api "repos/$launcher_repo/releases/latest" --jq .tag_name 2>/dev/null) || release=""
+case "$release" in launcher-[0-9]*) ;; *) release="" ;; esac
 echo "launcher pinned: $pinned, fork's latest launcher release: ${release:-none}"
 if [ -n "$release" ] && [ "${release#launcher-}" != "$pinned" ]; then
   rm -rf "$tmp/launcher" && mkdir -p "$tmp/launcher"
