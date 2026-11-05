@@ -46,6 +46,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          cache: gradle   # fewer downloads from Maven Central, which can refuse shared runners (429)
 
       - name: Signing key
         if: steps.v.outputs.new == 'true'
@@ -59,7 +60,7 @@ jobs:
 
       - name: Tests and signed APK
         if: steps.v.outputs.new == 'true'
-        run: ./gradlew --no-daemon --continue test :app:assembleFullRelease
+        run: .github/thomas/gradle-retry.sh ./gradlew --no-daemon --continue test :app:assembleFullRelease
 
       - name: The APK carries the fork's key and this version
         if: steps.v.outputs.new == 'true'
