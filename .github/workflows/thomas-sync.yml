@@ -108,6 +108,9 @@ jobs:
           title="Reprise de ${TAG:-la version amont} : à regarder"   # no quote inside ${...}: bash reads it as one
           body=$( [ -f "$RUNNER_TEMP/reason.md" ] && cat "$RUNNER_TEMP/reason.md" || echo "La compilation ou les tests ont échoué." )
           body="$body"$'\n\n'"Rien n'a été publié ; la version installée reste valable. Détail : $RUN"
-          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
-          # One issue per stop: the nights after it, while it is open, add nothing.
-          [ -n "$existing" ] || gh issue create --title "$title" --body "$body"
+          # REST, not gh issue list/create (GraphQL search, repository detection): one call each, by $GITHUB_REPOSITORY.
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" --jq "[.[] | select(.title == \"$title\")][0].number // empty" 2>&1) \
+            || { echo "::warning::issue lookup failed: $existing"; existing=""; }
+          if [ -n "$existing" ]; then echo "issue #$existing already open"; exit 0; fi
+          gh api "repos/$GITHUB_REPOSITORY/issues" -f title="$title" -f body="$body" --jq '"issue #\(.number) opened"' \
+            || { echo "::error::could not open the issue: $title"; printf '%s\n' "$body"; exit 1; }
