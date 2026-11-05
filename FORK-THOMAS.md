@@ -1,6 +1,6 @@
 # Fork « thomas » de l'appli téléphone Clean Your TV
 
-Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.7, MIT).
+Branche `thomas` de [udhaykumarbala/cleanyourtv-app](https://github.com/udhaykumarbala/cleanyourtv-app) (0.4.8, MIT).
 Identifiant d'appli `fr.thomas.cleanyourtv` (amont : `tv.cleanyour.app`), nom « Clean Your TV · Thomas ». Elle s'installe
 à côté de l'appli d'origine, qui garde son propre point de restauration.
 
@@ -11,8 +11,8 @@ l'appli amont (0.4.6.1-thomas.1) ; 3.x passe devant, la mise à jour est donc pr
 
 ## Ce que le fork change
 
-- **Launcher embarqué** : le fork du launcher (`Eliotm2/cleanyourtv`, branche `thomas`, 3.0-thomas.7, versionCode 16 :
-  le launcher 3.0 amont b06ab21 plus nos ajouts) à la place du launcher amont épinglé, signé avec la clé du fork, comme le rideau TV (`tv/curtain`, reconstruit et
+- **Launcher embarqué** : le fork du launcher (`Eliotm2/cleanyourtv`, branche `thomas`, 3.4-thomas.1, versionCode 18, commit b0d0d6f :
+  le launcher 3.4 amont plus nos ajouts ; l'appli 0.4.8 amont épingle encore le launcher 3.0) à la place du launcher amont épinglé, signé avec la clé du fork, comme le rideau TV (`tv/curtain`, reconstruit et
   re-signé) et l'appli elle-même. Les épingles sont dans `core/trust/.../Pins.kt` ; `verifyLauncherPin` et
   `verifyCurtainPin` tournent à chaque compilation.
 - **Installer une appli (APK)** : Manage › « Install an app ». Un fichier APK choisi sur le téléphone (sélecteur
@@ -35,7 +35,8 @@ l'appli amont (0.4.6.1-thomas.1) ; 3.x passe devant, la mise à jour est donc pr
   gardé sur le téléphone (`ForkGreeting`, fichier `fork-greeting-name.txt`) et ajouté à chaque look envoyé
   (`Look.encode` → `greeting_name`, que le launcher amont lit déjà : « BONSOIR, THOMAS »). Tant qu'aucun nom n'a été
   enregistré, les looks partent tels quels ; enregistré vide, la clé est omise.
-- **Vérification de mise à jour, repli sur le flux** (3.2-thomas.2, d'après la 0.4.7 amont) : quand l'API GitHub refuse
+- **Vérification de mise à jour, repli sur le flux** (3.2-thomas.2, d'après la 0.4.7 amont ; lecture en arrière-plan
+  de la 0.4.8 reprise en 3.4-thomas.1) : quand l'API GitHub refuse
   (60 requêtes par heure et par adresse, partagées sur un réseau mobile ou un VPN), l'appli lit le flux
   `releases.atom` du fork ; son dernier tag `-thomas.N` est la dernière version. La raison d'un échec va au journal.
 - **Vérification de mise à jour** (0.4.0-thomas.1) : « Check for updates » lit les releases de ce fork
@@ -58,6 +59,8 @@ au profit du sien. Procédure et historique dans `FORK-THOMAS.md` du launcher (`
 `ForkLook` (5 apps par rangée, remplacé par « apps in a row » de la 0.4.0). Essayé et gardé : `dock_bottom_room` du
 launcher (« Every app in one row » de la 0.4.5 met les applis sur la ligne du dock au lieu de les garder en dessous).
 On ne retire un ajout qu'après l'essai de Thomas sur la télé.
+Reprise 0.4.8 (05/11/2026) : aucun recouvrement (installation sur Google TV, adresse de la télé, correctifs) ; son
+correctif de « Check for updates » est fusionné dans notre vérification.
 
 ## Reprise automatique de l'original
 
@@ -72,9 +75,8 @@ On ne retire un ajout qu'après l'essai de Thomas sur la télé.
 3. Sinon : tests, APK signé avec la clé du fork (vérifiée), commit, push et release `<version>` avec l'APK.
 
 Secrets du dépôt (Settings › Secrets and variables › Actions) : `KEYSTORE_B64` (le keystore en base64) et
-`KEYSTORE_PROPERTIES` (`storePassword`, `keyAlias`, `keyPassword`). Le launcher (`Eliotm2/cleanyourtv`) n'a pas de
-reprise nocturne : l'appli embarque le launcher que la release amont épingle, et c'est l'étape 2 qui signale un
-changement.
+`KEYSTORE_PROPERTIES` (`storePassword`, `keyAlias`, `keyPassword`). Le launcher (`Eliotm2/cleanyourtv`) a sa propre
+reprise nocturne (01:07 UTC, `thomas-launcher.yml`) qui publie `launcher-<version>` ; l'étape 1 l'embarque la nuit même.
 
 ## Publication à chaque version poussée
 
